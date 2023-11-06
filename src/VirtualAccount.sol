@@ -82,7 +82,13 @@ contract VirtualAccount is IVirtualAccount, ERC1155Receiver {
     }
 
     /// @inheritdoc IVirtualAccount
-    function payableCall(PayableCall[] calldata calls) public payable returns (bytes[] memory returnData) {
+    function payableCall(PayableCall[] calldata calls)
+        public
+        payable
+        override
+        requiresApprovedCaller
+        returns (bytes[] memory returnData)
+    {
         uint256 valAccumulator;
         uint256 length = calls.length;
         returnData = new bytes[](length);
