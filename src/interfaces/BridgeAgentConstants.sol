@@ -18,9 +18,15 @@ contract BridgeAgentConstants {
 
     // Settlement / Deposit Redeeem Status
 
+    uint8 internal constant STATUS_SUCCESS = 0;
+
     uint8 internal constant STATUS_FAILED = 1;
 
-    uint8 internal constant STATUS_SUCCESS = 0;
+    // Deposit is Signed
+
+    uint8 internal constant SIGNED_DEPOSIT = 1;
+
+    uint8 internal constant UNSIGNED_DEPOSIT = 0;
 
     // Payload Encoding / Decoding
 

@@ -115,6 +115,21 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
         );
     }
 
+    
+    /// @inheritdoc IBranchRouter
+    function retryDeposit(
+        uint32 _depositNonce,
+        bytes calldata _params,
+        GasParams calldata _gParams,
+        bool _hasFallbackToggled
+    ) external payable override {
+        // Perform call to bridge agent.
+        IBridgeAgent(localBridgeAgentAddress).retryDeposit{value: msg.value}(
+            msg.sender, _depositNonce, _params, _gParams, _hasFallbackToggled
+        );
+    }
+
+
     /*///////////////////////////////////////////////////////////////
                 BRIDGE AGENT EXECUTOR EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/

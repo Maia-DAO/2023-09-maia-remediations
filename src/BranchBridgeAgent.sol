@@ -127,13 +127,13 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
             _lzEndpointAddress != address(0) || _rootChainId == _localChainId,
             "Layerzero Endpoint Address cannot be the zero address."
         );
-        require(_localRouterAddress != address(0), "Local Router Address cannot be the zero address.");
         require(_localPortAddress != address(0), "Local Port Address cannot be the zero address.");
 
         localChainId = _localChainId;
         rootChainId = _rootChainId;
         rootBridgeAgentAddress = _rootBridgeAgentAddress;
         lzEndpointAddress = _lzEndpointAddress;
+        // Can be zero address
         localRouterAddress = _localRouterAddress;
         localPortAddress = _localPortAddress;
         bridgeAgentExecutorAddress = DeployBranchBridgeAgentExecutor.deploy();
@@ -177,26 +177,12 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBranchBridgeAgent
-    function callOutSystem(address payable _refundee, bytes calldata _params, GasParams calldata _gParams)
-        external
-        payable
-        override
-        lock
-        requiresRouter
-    {
-        //Encode Data for cross-chain call.
-        bytes memory payload = abi.encodePacked(bytes1(0x00), depositNonce++, _params);
-
-        //Perform Call
-        _performCall(_refundee, payload, _gParams);
-    }
-
-    /// @inheritdoc IBranchBridgeAgent
     function callOut(address payable _refundee, bytes calldata _params, GasParams calldata _gParams)
         external
         payable
         override
         lock
+        requiresRouter
     {
         //Encode Data for cross-chain call.
         bytes memory payload = abi.encodePacked(bytes1(0x01), depositNonce++, _params);
@@ -211,7 +197,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         bytes calldata _params,
         DepositInput memory _dParams,
         GasParams calldata _gParams
-    ) external payable override lock {
+    ) external payable override lock requiresRouter {
         //Cache Deposit Nonce
         uint32 _depositNonce = depositNonce;
 
@@ -221,7 +207,9 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         );
 
         //Create Deposit and Send Cross-Chain request
-        _createDeposit(_depositNonce, _refundee, _dParams.hToken, _dParams.token, _dParams.amount, _dParams.deposit);
+        _createDeposit(
+            false, _depositNonce, _refundee, _dParams.hToken, _dParams.token, _dParams.amount, _dParams.deposit
+        );
 
         //Perform Call
         _performCall(_refundee, payload, _gParams);
@@ -233,7 +221,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         bytes calldata _params,
         DepositMultipleInput memory _dParams,
         GasParams calldata _gParams
-    ) external payable override lock {
+    ) external payable override lock requiresRouter {
         //Cache Deposit Nonce
         uint32 _depositNonce = depositNonce;
 
@@ -251,7 +239,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
 
         //Create Deposit and Send Cross-Chain request
         _createDepositMultiple(
-            _depositNonce, _refundee, _dParams.hTokens, _dParams.tokens, _dParams.amounts, _dParams.deposits
+            false, _depositNonce, _refundee, _dParams.hTokens, _dParams.tokens, _dParams.amounts, _dParams.deposits
         );
 
         //Perform Call
@@ -296,7 +284,9 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         );
 
         //Create Deposit and Send Cross-Chain request
-        _createDeposit(_depositNonce, _refundee, _dParams.hToken, _dParams.token, _dParams.amount, _dParams.deposit);
+        _createDeposit(
+            true, _depositNonce, _refundee, _dParams.hToken, _dParams.token, _dParams.amount, _dParams.deposit
+        );
 
         //Perform Call
         _performCall(_refundee, payload, _gParams);
@@ -328,7 +318,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
 
         // Create a Deposit and Send Cross-Chain request
         _createDepositMultiple(
-            _depositNonce, _refundee, _dParams.hTokens, _dParams.tokens, _dParams.amounts, _dParams.deposits
+            true, _depositNonce, _refundee, _dParams.hTokens, _dParams.tokens, _dParams.amounts, _dParams.deposits
         );
 
         //Perform Call
@@ -341,7 +331,61 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
 
     /// @inheritdoc IBranchBridgeAgent
     function retryDeposit(
-        bool _isSigned,
+        address _owner,
+        uint32 _depositNonce,
+        bytes calldata _params,
+        GasParams calldata _gParams,
+        bool _hasFallbackToggled
+    ) external payable override lock requiresRouter {
+        // Get Settlement Reference
+        Deposit storage deposit = getDeposit[_depositNonce];
+
+        // Check if deposit is not signed
+        if (deposit.isSigned == SIGNED_DEPOSIT) revert NotDepositOwner();
+
+        // Check if deposit belongs to message sender
+        if (deposit.owner != _owner) revert NotDepositOwner();
+
+        // Encode Data for cross-chain call.
+        bytes memory payload;
+
+        if (uint8(deposit.hTokens.length) == 1) {
+            // Pack new Data
+            payload = abi.encodePacked(
+                _hasFallbackToggled ? bytes1(0x82) : bytes1(0x02),
+                _depositNonce,
+                deposit.hTokens[0],
+                deposit.tokens[0],
+                deposit.amounts[0],
+                deposit.deposits[0],
+                _params
+            );
+        } else if (uint8(deposit.hTokens.length) > 1) {
+            // Pack new Data
+            payload = abi.encodePacked(
+                _hasFallbackToggled ? bytes1(0x83) : bytes1(0x03),
+                uint8(deposit.hTokens.length),
+                _depositNonce,
+                deposit.hTokens,
+                deposit.tokens,
+                deposit.amounts,
+                deposit.deposits,
+                _params
+            );
+        }
+
+        // Check if payload is empty
+        if (payload.length == 0) revert DepositRetryUnavailableUseCallout();
+
+        // Ensure success Status
+        deposit.status = STATUS_SUCCESS;
+
+        // Perform Call
+        _performCall(payable(msg.sender), payload, _gParams);
+    }
+
+    /// @inheritdoc IBranchBridgeAgent
+    function retryDepositSigned(
         uint32 _depositNonce,
         bytes calldata _params,
         GasParams calldata _gParams,
@@ -350,62 +394,40 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         // Get Settlement Reference
         Deposit storage deposit = getDeposit[_depositNonce];
 
-        //Check if deposit belongs to message sender
+        // Check if deposit is signed
+        if (deposit.isSigned == UNSIGNED_DEPOSIT) revert NotDepositOwner();
+
+        // Check if deposit belongs to message sender
         if (deposit.owner != msg.sender) revert NotDepositOwner();
 
-        //Encode Data for cross-chain call.
+        // Encode Data for cross-chain call.
         bytes memory payload;
 
         if (uint8(deposit.hTokens.length) == 1) {
-            if (_isSigned) {
-                //Pack new Data
-                payload = abi.encodePacked(
-                    _hasFallbackToggled ? bytes1(0x85) : bytes1(0x05),
-                    msg.sender,
-                    _depositNonce,
-                    deposit.hTokens[0],
-                    deposit.tokens[0],
-                    deposit.amounts[0],
-                    deposit.deposits[0],
-                    _params
-                );
-            } else {
-                payload = abi.encodePacked(
-                    bytes1(0x02),
-                    _depositNonce,
-                    deposit.hTokens[0],
-                    deposit.tokens[0],
-                    deposit.amounts[0],
-                    deposit.deposits[0],
-                    _params
-                );
-            }
+            // Pack new Data
+            payload = abi.encodePacked(
+                _hasFallbackToggled ? bytes1(0x85) : bytes1(0x05),
+                msg.sender,
+                _depositNonce,
+                deposit.hTokens[0],
+                deposit.tokens[0],
+                deposit.amounts[0],
+                deposit.deposits[0],
+                _params
+            );
         } else if (uint8(deposit.hTokens.length) > 1) {
-            if (_isSigned) {
-                //Pack new Data
-                payload = abi.encodePacked(
-                    _hasFallbackToggled ? bytes1(0x86) : bytes1(0x06),
-                    msg.sender,
-                    uint8(deposit.hTokens.length),
-                    _depositNonce,
-                    deposit.hTokens,
-                    deposit.tokens,
-                    deposit.amounts,
-                    deposit.deposits,
-                    _params
-                );
-            } else {
-                payload = abi.encodePacked(
-                    bytes1(0x03),
-                    uint8(deposit.hTokens.length),
-                    _depositNonce,
-                    deposit.hTokens,
-                    deposit.tokens,
-                    deposit.amounts,
-                    deposit.deposits,
-                    _params
-                );
-            }
+            // Pack new Data
+            payload = abi.encodePacked(
+                _hasFallbackToggled ? bytes1(0x86) : bytes1(0x06),
+                msg.sender,
+                uint8(deposit.hTokens.length),
+                _depositNonce,
+                deposit.hTokens,
+                deposit.tokens,
+                deposit.amounts,
+                deposit.deposits,
+                _params
+            );
         }
 
         // Check if payload is empty
@@ -596,7 +618,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         uint32 nonce;
 
         // DEPOSIT FLAG: 0 (No settlement)
-        if (flag == 0x00) {
+        if (flag == 0x01) {
             // Get Settlement Nonce
             nonce = uint32(bytes4(_payload[PARAMS_START_SIGNED:PARAMS_TKN_START_SIGNED]));
 
@@ -613,7 +635,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
             );
 
             // DEPOSIT FLAG: 1 (Single Asset Settlement)
-        } else if (flag == 0x01) {
+        } else if (flag == 0x02) {
             // Parse recipient
             address payable recipient = payable(address(uint160(bytes20(_payload[PARAMS_START:PARAMS_START_SIGNED]))));
 
@@ -635,7 +657,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
             );
 
             // DEPOSIT FLAG: 2 (Multiple Settlement)
-        } else if (flag == 0x02) {
+        } else if (flag == 0x03) {
             // Parse recipient
             address payable recipient = payable(address(uint160(bytes20(_payload[PARAMS_START:PARAMS_START_SIGNED]))));
 
@@ -660,7 +682,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
             );
 
             //DEPOSIT FLAG: 3 (Retrieve Settlement)
-        } else if (flag == 0x03) {
+        } else if (flag == 0x04) {
             // Parse recipient
             address payable recipient = payable(address(uint160(bytes20(_payload[PARAMS_START:PARAMS_START_SIGNED]))));
 
@@ -678,7 +700,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
             }
 
             //DEPOSIT FLAG: 4 (Fallback)
-        } else if (flag == 0x04) {
+        } else if (flag == 0x05) {
             //Get nonce
             nonce = uint32(bytes4(_payload[PARAMS_START:PARAMS_TKN_START]));
 
@@ -810,6 +832,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
      *
      */
     function _createDeposit(
+        bool isSigned,
         uint32 _depositNonce,
         address payable _refundee,
         address _hToken,
@@ -843,7 +866,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         uintArray[0] = _deposit;
         deposit.deposits = uintArray;
 
-        deposit.status = STATUS_SUCCESS;
+        if (isSigned) deposit.isSigned = SIGNED_DEPOSIT;
     }
 
     /**
@@ -858,6 +881,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
      *
      */
     function _createDepositMultiple(
+        bool isSigned,
         uint32 _depositNonce,
         address payable _refundee,
         address[] memory _hTokens,
@@ -884,7 +908,8 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         deposit.tokens = _tokens;
         deposit.amounts = _amounts;
         deposit.deposits = _deposits;
-        deposit.status = STATUS_SUCCESS;
+
+        if (isSigned) deposit.isSigned = SIGNED_DEPOSIT;
     }
 
     /*///////////////////////////////////////////////////////////////

@@ -45,11 +45,11 @@ import {
  *         ------------------------------
  *         ID   | DESCRIPTION
  *         -----+------------------------
- *         0x00 | Call to Branch without Settlement.
- *         0x01 | Call to Branch with Settlement.
- *         0x02 | Call to Branch with Settlement of Multiple Tokens.
- *         0x03 | Call to `retrieveSettlement()´. (trigger `_fallback` for a settlement that has not been executed)
- *         0x04 | Call to `_fallback()`. (reopens a deposit for asset redemption)
+ *         0x01 | Call to Branch without Settlement.
+ *         0x02 | Call to Branch with Settlement.
+ *         0x03 | Call to Branch with Settlement of Multiple Tokens.
+ *         0x04 | Call to `retrieveSettlement()´. (trigger `_fallback` for a settlement that has not been executed)
+ *         0x05 | Call to `_fallback()`. (reopens a deposit for asset redemption)
  *
  *
  *         Encoding Scheme for different Root Bridge Agent Deposit Flags:
@@ -125,19 +125,6 @@ interface IBranchBridgeAgent is ILayerZeroReceiver {
     /*///////////////////////////////////////////////////////////////
                     USER AND BRANCH ROUTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Internal function performs call to Layerzero Enpoint Contract for cross-chain messaging.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params calldata for omnichain execution.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @dev DEPOSIT ID: 0 (System Call / Response)
-     *   @dev this flag allows for identifying system emitted request/responses.
-     *
-     */
-    function callOutSystem(address payable gasRefundee, bytes calldata params, GasParams calldata gasParams)
-        external
-        payable;
 
     /**
      * @notice Function to perform a call to the Root Omnichain Router without token deposit.
@@ -238,15 +225,30 @@ interface IBranchBridgeAgent is ILayerZeroReceiver {
 
     /**
      * @notice Function to perform a call to the Root Omnichain Environment
-     *         retrying a failed deposit that hasn't been executed yet.
-     *   @param isSigned Flag to indicate if the deposit was signed.
+     *         retrying a failed non-signed deposit that hasn't been executed yet.
+     *   @param owner address of the deposit owner.
      *   @param depositNonce Identifier for user deposit.
      *   @param params parameters to execute on the root chain router.
      *   @param gasParams gas parameters for the cross-chain call.
      *   @param hasFallbackToggled flag to indicate if the fallback function was toggled.
      */
     function retryDeposit(
-        bool isSigned,
+        address owner,
+        uint32 depositNonce,
+        bytes calldata params,
+        GasParams calldata gasParams,
+        bool hasFallbackToggled
+    ) external payable;
+
+    /**
+     * @notice Function to perform a call to the Root Omnichain Environment
+     *         retrying a failed signed deposit that hasn't been executed yet.
+     *   @param depositNonce Identifier for user deposit.
+     *   @param params parameters to execute on the root chain router.
+     *   @param gasParams gas parameters for the cross-chain call.
+     *   @param hasFallbackToggled flag to indicate if the fallback function was toggled.
+     */
+    function retryDepositSigned(
         uint32 depositNonce,
         bytes calldata params,
         GasParams calldata gasParams,

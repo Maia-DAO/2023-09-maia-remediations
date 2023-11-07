@@ -41,22 +41,6 @@ contract RootBridgeAgentExecutor is Ownable, BridgeAgentConstants {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Execute a system request from a remote chain
-     * @param _router The address of the router to execute the request on
-     * @param _payload The encoded request data payload
-     * @param _srcChainId The chain id of the chain that sent the request
-     * @dev DEPOSIT FLAG: 0 (System request / response)
-     */
-    function executeSystemRequest(address _router, bytes calldata _payload, uint16 _srcChainId)
-        external
-        payable
-        onlyOwner
-    {
-        //Try to execute remote request
-        IRouter(_router).executeResponse(_payload[PARAMS_TKN_START:], _srcChainId);
-    }
-
-    /**
      * @notice Execute a remote request from a remote chain
      * @param _router The address of the router to execute the request on
      * @param _payload The encoded request data payload
