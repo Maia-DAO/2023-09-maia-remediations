@@ -19,7 +19,7 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Local Network Identifier.
-    uint16 public immutable localChainId;
+    uint16 public immutable rootChainId;
 
     /// @notice Address for Local Port Address
     /// @dev where funds deposited from this chain are kept, managed and supplied to different Port Strategies.
@@ -32,13 +32,13 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
     /**
      * @notice Constructor for Arbitrum Branch Port.
      * @param _owner owner of the contract.
-     * @param _localChainId arbitrum layer zero chain id.
+     * @param _rootChainId arbitrum layer zero chain id.
      * @param _rootPortAddress address of the Root Port.
      */
-    constructor(uint16 _localChainId, address _rootPortAddress, address _owner) BranchPort(_owner) {
+    constructor(uint16 _rootChainId, address _rootPortAddress, address _owner) BranchPort(_owner) {
         require(_rootPortAddress != address(0), "Root Port Address cannot be 0");
 
-        localChainId = _localChainId;
+        rootChainId = _rootChainId;
         rootPortAddress = _rootPortAddress;
     }
 
@@ -57,7 +57,7 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
         address _rootPortAddress = rootPortAddress;
 
         // Get global token address from root port
-        address _globalToken = IRootPort(_rootPortAddress).getLocalTokenFromUnderlying(_underlyingAddress, localChainId);
+        address _globalToken = IRootPort(_rootPortAddress).getLocalTokenFromUnderlying(_underlyingAddress, rootChainId);
 
         // Check if the global token exists
         if (_globalToken == address(0)) revert UnknownGlobalToken();
@@ -80,11 +80,11 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
         address _rootPortAddress = rootPortAddress;
 
         // Check if the global token exists
-        if (!IRootPort(_rootPortAddress).isGlobalToken(_globalAddress, localChainId)) revert UnknownGlobalToken();
+        if (!IRootPort(_rootPortAddress).isGlobalToken(_globalAddress, rootChainId)) revert UnknownGlobalToken();
 
         // Get the underlying token address from the root port
         address _underlyingAddress =
-            IRootPort(_rootPortAddress).getUnderlyingTokenFromLocal(_globalAddress, localChainId);
+            IRootPort(_rootPortAddress).getUnderlyingTokenFromLocal(_globalAddress, rootChainId);
 
         // Check if the underlying token exists
         if (_underlyingAddress == address(0)) revert UnknownUnderlyingToken();

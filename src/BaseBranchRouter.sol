@@ -57,14 +57,15 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
      * @notice Initializes the Base Branch Router.
      * @param _localBridgeAgentAddress The address of the local Bridge Agent.
      */
-    function initialize(address _localBridgeAgentAddress) external onlyOwner {
+    function initialize(address _localBridgeAgentAddress) public virtual onlyOwner {
         require(_localBridgeAgentAddress != address(0), "Bridge Agent address cannot be 0");
+        renounceOwnership();
+
         localBridgeAgentAddress = _localBridgeAgentAddress;
         localPortAddress = IBridgeAgent(_localBridgeAgentAddress).localPortAddress();
         bridgeAgentExecutorAddress = IBridgeAgent(_localBridgeAgentAddress).bridgeAgentExecutorAddress();
-        
-        renounceOwnership();
     }
+
 
     /*///////////////////////////////////////////////////////////////
                         VIEW FUNCTIONS
@@ -115,7 +116,6 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
         );
     }
 
-    
     /// @inheritdoc IBranchRouter
     function retryDeposit(
         uint32 _depositNonce,
@@ -128,7 +128,6 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
             msg.sender, _depositNonce, _params, _gParams, _hasFallbackToggled
         );
     }
-
 
     /*///////////////////////////////////////////////////////////////
                 BRIDGE AGENT EXECUTOR EXTERNAL FUNCTIONS
@@ -172,22 +171,21 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
      *   @param _amount The amount of the hToken.
      *   @param _deposit The amount of the token.
      */
-    function _transferAndApproveToken(address _hToken, address _token, uint256 _amount, uint256 _deposit) internal {
-        // Cache local port address
-        address _localPortAddress = localPortAddress;
-
+    function _transferAndApproveToken(address _hToken, address _token, uint256 _amount, uint256 _deposit)
+        internal
+        virtual
+    {
         // Check if the local branch tokens are being spent
         if (_amount - _deposit > 0) {
             unchecked {
                 _hToken.safeTransferFrom(msg.sender, address(this), _amount - _deposit);
-                ERC20(_hToken).approve(_localPortAddress, _amount - _deposit);
             }
         }
 
         // Check if the underlying tokens are being spent
         if (_deposit > 0) {
             _token.safeTransferFrom(msg.sender, address(this), _deposit);
-            ERC20(_token).approve(_localPortAddress, _deposit);
+            _token.safeApprove(localPortAddress, _deposit);
         }
     }
 
