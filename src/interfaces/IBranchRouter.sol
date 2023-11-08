@@ -78,6 +78,13 @@ interface IBranchRouter {
      */
     function getDepositEntry(uint32 depositNonce) external view returns (Deposit memory);
 
+    function retryDeposit(
+        uint32 _depositNonce,
+        bytes calldata _params,
+        GasParams calldata _gParams,
+        bool _hasFallbackToggled
+    ) external payable;
+
     /*///////////////////////////////////////////////////////////////
                         LAYERZERO EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/

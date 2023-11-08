@@ -115,13 +115,41 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
+                            USER FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IRootRouter
+    function retrySettlement(
+        uint32 _settlementNonce,
+        address _recipient,
+        bytes calldata _params,
+        GasParams calldata _gParams,
+        bool _hasFallbackToggled
+    ) external payable override {
+        // Perform call to bridge agent.
+        IBridgeAgent(bridgeAgentAddress).retrySettlement{value: msg.value}(
+            msg.sender, _settlementNonce, _recipient, _params, _gParams, _hasFallbackToggled
+        );
+    }
+
+    /*///////////////////////////////////////////////////////////////
                         LAYERZERO FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRootRouter
-    /// @dev This function will revert when called.
-    function executeResponse(bytes memory, uint16) external payable override {
-        revert();
+    function executeRetrySettlement(
+        address _owner,
+        uint32 _settlementNonce,
+        address _recipient,
+        bytes calldata _params,
+        GasParams calldata _gParams,
+        bool _hasFallbackToggled,
+        uint16
+    ) public payable override requiresBridgeAgent {
+        // Perform call to bridge agent.
+        IBridgeAgent(bridgeAgentAddress).retrySettlement{value: msg.value}(
+            _owner, _settlementNonce, _recipient, _params, _gParams, _hasFallbackToggled
+        );
     }
 
     /**
@@ -603,5 +631,11 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     /// @notice Verifies the caller is the Bridge Agent Executor. Internal function used in modifier to reduce contract bytesize.
     function _requiresExecutor() internal view {
         if (msg.sender != bridgeAgentExecutorAddress) revert UnrecognizedBridgeAgentExecutor();
+    }
+
+    /// @notice Verifies the caller is the Bridge Agent Executor.
+    modifier requiresBridgeAgent() {
+        if (msg.sender != bridgeAgentAddress) revert UnrecognizedBridgeAgent();
+        _;
     }
 }

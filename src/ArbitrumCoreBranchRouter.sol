@@ -62,7 +62,7 @@ contract ArbitrumCoreBranchRouter is CoreBranchRouter {
         bytes memory payload = abi.encodePacked(bytes1(0x02), params);
 
         //Send Cross-Chain request (System Response/Request)
-        IBridgeAgent(localBridgeAgentAddress).callOutSystem(payable(msg.sender), payload, GasParams(0, 0));
+        IBridgeAgent(localBridgeAgentAddress).callOut(payable(msg.sender), payload, GasParams(0, 0));
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -79,8 +79,6 @@ contract ArbitrumCoreBranchRouter is CoreBranchRouter {
      *    @param _refundee the address of the excess gas receiver.
      *    @param _gParams Gas parameters for remote execution.
      *    @dev FUNC ID: 2
-     *    @dev all hTokens have 18 decimals.
-     *
      */
     function _receiveAddBridgeAgent(
         address _newBranchRouter,
@@ -115,7 +113,7 @@ contract ArbitrumCoreBranchRouter is CoreBranchRouter {
         bytes memory payload = abi.encodePacked(bytes1(0x04), data);
 
         //Send Cross-Chain request
-        IBridgeAgent(localBridgeAgentAddress).callOutSystem(payable(_refundee), payload, _gParams);
+        IBridgeAgent(localBridgeAgentAddress).callOut(payable(_refundee), payload, _gParams);
     }
 
     /*///////////////////////////////////////////////////////////////

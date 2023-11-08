@@ -43,7 +43,6 @@ import {
  *       ------------------------------
  *       ID   | DESCRIPTION
  *       -----+------------------------
- *       0x00 | Branch Router System Request / Response.
  *       0x01 | Call to Root Router without Deposit.
  *       0x02 | Call to Root Router with Deposit.
  *       0x03 | Call to Root Router with Deposit of Multiple Tokens.
@@ -68,13 +67,12 @@ import {
  *      |           1 byte              |         4-25 bytes         |       104 or (128 * n) bytes       |   ---	 |
  *      |                               |                            |           hT - t - A - D           |          |
  *      |_______________________________|____________________________|____________________________________|__________|
- *      | callOutSystem = 0x0   	    |                 4b(nonce)  |            -------------           |   ---	 |
- *      | callOut = 0x1                 |                 4b(nonce)  |            -------------           |   ---	 |
- *      | callOutSingle = 0x2           |                 4b(nonce)  |        20b + 20b + 32b + 32b       |   ---	 |
- *      | callOutMulti = 0x3            |         1b(n) + 4b(nonce)  |   	  32b + 32b + 32b + 32b       |   ---	 |
- *      | callOutSigned = 0x4           |    20b(recip) + 4b(nonce)  |   	      -------------           |   ---    |
- *      | callOutSignedSingle = 0x5     |           20b + 4b(nonce)  |        20b + 20b + 32b + 32b       |   ---	 |
- *      | callOutSignedMultiple = 0x6   |   20b + 1b(n) + 4b(nonce)  |        32b + 32b + 32b + 32b       |   ---	 |
+ *      | callOut = 0x01                |                 4b(nonce)  |            -------------           |   ---	 |
+ *      | callOutSingle = 0x02          |                 4b(nonce)  |        20b + 20b + 32b + 32b       |   ---	 |
+ *      | callOutMulti = 0x03           |         1b(n) + 4b(nonce)  |   	  32b + 32b + 32b + 32b       |   ---	 |
+ *      | callOutSigned = 0x04          |    20b(recip) + 4b(nonce)  |   	      -------------           |   ---    |
+ *      | callOutSignedSingle = 0x05    |           20b + 4b(nonce)  |        20b + 20b + 32b + 32b       |   ---	 |
+ *      | callOutSignedMultiple = 0x06  |   20b + 1b(n) + 4b(nonce)  |        32b + 32b + 32b + 32b       |   ---	 |
  *      |_______________________________|____________________________|____________________________________|__________|
  *
  *          Generic Contract Interaction Flow:
@@ -226,14 +224,15 @@ interface IRootBridgeAgent is ILayerZeroReceiver {
 
     /**
      * @notice Function to retry a user's Settlement balance.
+     *   @param _owner owner of the settlement.
      *   @param _settlementNonce Identifier for token settlement.
      *   @param _recipient recipient of bridged tokens and any outstanding gas on the destination chain.
      *   @param _params Calldata for function call in branch chain.
      *   @param _gParams Gas Parameters for cross-chain message.
      *   @param _hasFallbackToggled Flag to toggle fallback function.
-     *
      */
     function retrySettlement(
+        address _owner,
         uint32 _settlementNonce,
         address _recipient,
         bytes calldata _params,

@@ -289,22 +289,38 @@ contract CoreRootRouter is IRootRouter, Ownable {
         );
     }
 
+    /// @inheritdoc IRootRouter
+    function retrySettlement(uint32, address, bytes calldata, GasParams calldata, bool) external payable override {
+        revert();
+    }
+
     /*///////////////////////////////////////////////////////////////
                         LAYERZERO FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRootRouter
-    function executeResponse(bytes calldata _encodedData, uint16 _srcChainId)
-        external
+    function executeRetrySettlement(address, uint32, address, bytes calldata, GasParams calldata, bool, uint16)
+        public
         payable
         override
-        requiresExecutor
     {
+        revert();
+    }
+
+    /// @inheritdoc IRootRouter
+    function execute(bytes calldata _encodedData, uint16 _srcChainId) external payable override requiresExecutor {
         // Parse funcId
         bytes1 funcId = _encodedData[0];
 
-        ///  FUNC ID: 2 (_addLocalToken)
-        if (funcId == 0x02) {
+        /// FUNC ID: 1 (_addGlobalToken)
+        if (funcId == 0x01) {
+            (address refundee, address globalAddress, uint16 dstChainId, GasParams[2] memory gasParams) =
+                abi.decode(_encodedData[1:], (address, address, uint16, GasParams[2]));
+
+            _addGlobalToken(refundee, globalAddress, dstChainId, gasParams);
+
+            ///  FUNC ID: 2 (_addLocalToken)
+        } else if (funcId == 0x02) {
             (address underlyingAddress, address localAddress, string memory name, string memory symbol, uint8 decimals)
             = abi.decode(_encodedData[1:], (address, address, string, string, uint8));
 
@@ -321,24 +337,6 @@ contract CoreRootRouter is IRootRouter, Ownable {
             (address newBranchBridgeAgent, address rootBridgeAgent) = abi.decode(_encodedData[1:], (address, address));
 
             _syncBranchBridgeAgent(newBranchBridgeAgent, rootBridgeAgent, _srcChainId);
-
-            /// Unrecognized Function Selector
-        } else {
-            revert UnrecognizedFunctionId();
-        }
-    }
-
-    /// @inheritdoc IRootRouter
-    function execute(bytes calldata _encodedData, uint16) external payable override requiresExecutor {
-        // Parse funcId
-        bytes1 funcId = _encodedData[0];
-
-        /// FUNC ID: 1 (_addGlobalToken)
-        if (funcId == 0x01) {
-            (address refundee, address globalAddress, uint16 dstChainId, GasParams[2] memory gasParams) =
-                abi.decode(_encodedData[1:], (address, address, uint16, GasParams[2]));
-
-            _addGlobalToken(refundee, globalAddress, dstChainId, gasParams);
 
             /// Unrecognized Function Selector
         } else {

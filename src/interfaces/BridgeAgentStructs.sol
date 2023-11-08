@@ -12,6 +12,7 @@ struct GasParams {
 
 struct Deposit {
     uint8 status;
+    uint88 isSigned;
     address owner;
     address[] hTokens;
     address[] tokens;
