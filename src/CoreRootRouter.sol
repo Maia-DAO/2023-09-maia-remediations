@@ -177,31 +177,6 @@ contract CoreRootRouter is IRootRouter, Ownable {
     }
 
     /**
-     * @notice Remove a Branch Bridge Agent.
-     * @param _branchBridgeAgent Address of the Branch Bridge Agent to be updated.
-     * @param _refundee Receiver of any leftover execution gas upon reaching destination network.
-     * @param _dstChainId Chain Id of the branch chain where the new Bridge Agent will be deployed.
-     * @param _gParams Gas parameters for remote execution.
-     */
-    function removeBranchBridgeAgent(
-        address _branchBridgeAgent,
-        address _refundee,
-        uint16 _dstChainId,
-        GasParams calldata _gParams
-    ) external payable onlyOwner {
-        //Encode CallData
-        bytes memory params = abi.encode(_branchBridgeAgent);
-
-        // Pack funcId into data
-        bytes memory payload = abi.encodePacked(bytes1(0x04), params);
-
-        //Add new global token to branch chain
-        IBridgeAgent(bridgeAgentAddress).callOut{value: msg.value}(
-            payable(_refundee), _refundee, _dstChainId, payload, _gParams
-        );
-    }
-
-    /**
      * @notice Add or Remove a Strategy Token.
      * @param _underlyingToken Address of the underlying token to be added for use in Branch strategies.
      * @param _minimumReservesRatio Minimum Branch Port reserves ratio for the underlying token.

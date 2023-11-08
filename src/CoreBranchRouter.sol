@@ -119,9 +119,6 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
             /// _removeBranchBridgeAgent
         } else if (_params[0] == 0x04) {
-            (address branchBridgeAgent) = abi.decode(_params[1:], (address));
-
-            _removeBranchBridgeAgent(branchBridgeAgent);
 
             /// _manageStrategyToken
         } else if (_params[0] == 0x05) {
@@ -253,22 +250,6 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
             // If not, add it.
             IPort(_localPortAddress).addBridgeAgentFactory(_newBridgeAgentFactoryAddress);
         }
-    }
-
-    /**
-     * @notice Function to remove an active Branch Bridge Agent from the system.
-     *  @param _branchBridgeAgent the address of the local Bridge Agent to be removed.
-     *  @dev FUNC ID: 4
-     */
-    function _removeBranchBridgeAgent(address _branchBridgeAgent) internal {
-        // Save Port Address to memory
-        address _localPortAddress = localPortAddress;
-
-        // Revert if it is not an active BridgeAgent
-        if (!IPort(_localPortAddress).isBridgeAgent(_branchBridgeAgent)) revert UnrecognizedBridgeAgent();
-
-        // Remove BridgeAgent
-        IPort(_localPortAddress).toggleBridgeAgent(_branchBridgeAgent);
     }
 
     /*///////////////////////////////////////////////////////////////

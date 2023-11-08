@@ -148,8 +148,6 @@ contract ArbitrumCoreBranchRouter is CoreBranchRouter {
 
             /// _removeBranchBridgeAgent
         } else if (_data[0] == 0x04) {
-            (address branchBridgeAgent) = abi.decode(_data[1:], (address));
-            _removeBranchBridgeAgent(branchBridgeAgent);
 
             /// _manageStrategyToken
         } else if (_data[0] == 0x05) {

@@ -375,7 +375,7 @@ contract RootPort is Ownable, IRootPort {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        BRIDGE AGENT ADDITION FUNCTIONS
+                        BRIDGE AGENT MANAGEMENT FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRootPort
@@ -409,13 +409,6 @@ contract RootPort is Ownable, IRootPort {
     /*///////////////////////////////////////////////////////////////
                             ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IRootPort
-    function toggleBridgeAgent(address _bridgeAgent) external override onlyOwner {
-        isBridgeAgent[_bridgeAgent] = !isBridgeAgent[_bridgeAgent];
-
-        emit BridgeAgentToggled(_bridgeAgent);
-    }
 
     /// @inheritdoc IRootPort
     function addBridgeAgentFactory(address _bridgeAgentFactory) external override onlyOwner {

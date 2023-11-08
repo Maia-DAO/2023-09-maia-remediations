@@ -352,13 +352,6 @@ contract BranchPort is Ownable, IBranchPort {
     }
 
     /// @inheritdoc IBranchPort
-    function toggleBridgeAgent(address _bridgeAgent) external override requiresCoreRouter {
-        isBridgeAgent[_bridgeAgent] = !isBridgeAgent[_bridgeAgent];
-
-        emit BridgeAgentToggled(_bridgeAgent);
-    }
-
-    /// @inheritdoc IBranchPort
     function addStrategyToken(address _token, uint256 _minimumReservesRatio) external override requiresCoreRouter {
         if (_minimumReservesRatio >= DIVISIONER || _minimumReservesRatio < MIN_RESERVE_RATIO) {
             revert InvalidMinimumReservesRatio();
