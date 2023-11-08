@@ -481,17 +481,24 @@ contract RootPort is Ownable, IRootPort {
 
     /// @inheritdoc IRootPort
     function addEcosystemToken(address _ecoTokenGlobalAddress) external override onlyOwner {
-        // Check if token already added
+        // Check if token already added as ecosystem token
         if (isGlobalAddress[_ecoTokenGlobalAddress]) revert AlreadyAddedEcosystemToken();
 
-        // Check if token is already a underlying token in current chain
+        // Check if token is an hToken
         if (getUnderlyingTokenFromLocal[_ecoTokenGlobalAddress][localChainId] != address(0)) {
             revert AlreadyAddedEcosystemToken();
         }
 
-        // Check if token is already a local branch token in current chain
-        if (getLocalTokenFromUnderlying[_ecoTokenGlobalAddress][localChainId] != address(0)) {
-            revert AlreadyAddedEcosystemToken();
+        // Check if token already added as underlying token
+        address localTokenAddress = getLocalTokenFromUnderlying[_ecoTokenGlobalAddress][localChainId];
+        if (localTokenAddress != address(0)) {
+            // If there is a deposit of the underlying token, revert
+            if (ERC20hTokenRoot(localTokenAddress).totalSupply() > 0) {
+                revert AlreadyAddedEcosystemToken();
+            } else {
+                getUnderlyingTokenFromLocal[localTokenAddress][localChainId] = address(0);
+                getLocalTokenFromUnderlying[_ecoTokenGlobalAddress][localChainId] = address(0);
+            }
         }
 
         // Update State
