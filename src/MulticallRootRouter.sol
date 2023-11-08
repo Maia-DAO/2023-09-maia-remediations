@@ -15,8 +15,6 @@ import {IRootRouter, DepositParams, DepositMultipleParams} from "./interfaces/IR
 import {IVirtualAccount, Call} from "./interfaces/IVirtualAccount.sol";
 
 struct OutputParams {
-    // Address to retry/retrieve/redeem the output assets.
-    address settlementOwner;
     // Address to receive the output assets.
     address recipient;
     // Address of the output hToken.
@@ -28,8 +26,6 @@ struct OutputParams {
 }
 
 struct OutputMultipleParams {
-    // Address to retry/retrieve/redeem the output assets.
-    address settlementOwner;
     // Address to receive the output assets.
     address recipient;
     // Addresses of the output hTokens.
@@ -44,7 +40,7 @@ struct OutputMultipleParams {
  * @title  Multicall Root Router Contract
  * @author MaiaDAO
  * @notice Root Router implementation for interfacing with third-party dApps present in the Root Omnichain Environment.
- * @dev    Func IDs for calling these  functions through the messaging layer:
+ * @dev    Func IDs for calling these  functions through messaging layer:
  *
  *         CROSS-CHAIN MESSAGING FUNCIDs
  *         -----------------------------
@@ -53,17 +49,13 @@ struct OutputMultipleParams {
  *         0x01         | multicallNoOutput
  *         0x02         | multicallSingleOutput
  *         0x03         | multicallMultipleOutput
+ *         0x04         | multicallSignedNoOutput
+ *         0x05         | multicallSignedSingleOutput
+ *         0x06         | multicallSignedMultipleOutput
+ *
  */
 contract MulticallRootRouter is IRootRouter, Ownable {
     using SafeTransferLib for address;
-
-    /*///////////////////////////////////////////////////////////////
-                            CONSTANTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Used for identifying cases when this contract's balance of a token is to be used as an input
-    /// This value is equivalent to 1<<255, i.e. a singular 1 in the most significant bit.
-    uint256 internal constant CONTRACT_BALANCE = 0x8000000000000000000000000000000000000000000000000000000000000000;
 
     /*///////////////////////////////////////////////////////////////
                     MULTICALL ROOT ROUTER STATE
@@ -116,70 +108,15 @@ contract MulticallRootRouter is IRootRouter, Ownable {
      */
     function initialize(address _bridgeAgentAddress) external onlyOwner {
         require(_bridgeAgentAddress != address(0), "Bridge Agent Address cannot be 0");
-        renounceOwnership();
 
         bridgeAgentAddress = payable(_bridgeAgentAddress);
         bridgeAgentExecutorAddress = IBridgeAgent(_bridgeAgentAddress).bridgeAgentExecutorAddress();
+        renounceOwnership();
     }
 
     /*///////////////////////////////////////////////////////////////
                             USER FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
-
-    /**
-     *  @notice Function to call 'callOutAndBridge' on RootBridgeAgent.
-     *  @param settlementOwner settlement owner and excess gas receiver.
-     *  @param recipient Address to receive the output assets.
-     *  @param outputToken Address of the output hToken.
-     *  @param amountOut Amount of output hTokens to send.
-     *  @param depositOut Amount of output hTokens to deposit.
-     *  @param dstChainId Chain Id of the destination chain.
-     *  @param gasParams Amounts of tokens to withdraw from the destination port.
-     */
-    function callOutAndBridge(
-        address settlementOwner,
-        address recipient,
-        address outputToken,
-        uint256 amountOut,
-        uint256 depositOut,
-        uint16 dstChainId,
-        GasParams memory gasParams
-    ) external payable virtual {
-        outputToken.safeTransferFrom(msg.sender, address(this), amountOut);
-
-        _approveAndCallOut(settlementOwner, recipient, outputToken, amountOut, depositOut, dstChainId, gasParams);
-    }
-
-    /**
-     *  @notice Function to call 'callOutAndBridgeMultiple' on RootBridgeAgent.
-     *  @param settlementOwner settlement owner and excess gas receiver.
-     *  @param recipient Address to receive the output assets.
-     *  @param outputTokens Addresses of the output hTokens.
-     *  @param amountsOut Total amount of tokens to send.
-     *  @param depositsOut Amounts of tokens to withdraw from the destination port.
-     *  @param gasParams Amounts of tokens to withdraw from the destination port.
-     */
-    function callOutAndBridgeMultiple(
-        address settlementOwner,
-        address recipient,
-        address[] memory outputTokens,
-        uint256[] memory amountsOut,
-        uint256[] memory depositsOut,
-        uint16 dstChainId,
-        GasParams memory gasParams
-    ) external payable virtual {
-        for (uint256 i = 0; i < outputTokens.length;) {
-            outputTokens[i].safeTransferFrom(msg.sender, address(this), amountsOut[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        _approveMultipleAndCallOut(
-            settlementOwner, recipient, outputTokens, amountsOut, depositsOut, dstChainId, gasParams
-        );
-    }
 
     /// @inheritdoc IRootRouter
     function retrySettlement(
@@ -252,7 +189,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
             // Bridge Out assets
             _approveAndCallOut(
-                outputParams.settlementOwner,
+                outputParams.recipient,
                 outputParams.recipient,
                 outputParams.outputToken,
                 outputParams.amountOut,
@@ -276,7 +213,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
             // Bridge Out assets
             _approveMultipleAndCallOut(
-                outputParams.settlementOwner,
+                outputParams.recipient,
                 outputParams.recipient,
                 outputParams.outputTokens,
                 outputParams.amountsOut,
@@ -296,11 +233,21 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     ///@inheritdoc IRootRouter
+
     function executeDepositMultiple(bytes calldata, DepositMultipleParams calldata, uint16) external payable {
         revert();
     }
 
-    ///  @inheritdoc IRootRouter
+    /**
+     *  @inheritdoc IRootRouter
+     *  @dev FuncIDs
+     *
+     *  FUNC ID      | FUNC NAME
+     *  0x01         |  multicallNoOutput
+     *  0x02         |  multicallSingleOutput
+     *  0x03         |  multicallMultipleOutput
+     *
+     */
     function executeSigned(bytes calldata encodedData, address userAccount, uint16)
         external
         payable
@@ -308,39 +255,6 @@ contract MulticallRootRouter is IRootRouter, Ownable {
         lock
         requiresExecutor
     {
-        _executeSigned(encodedData, userAccount);
-    }
-
-    ///  @inheritdoc IRootRouter
-    function executeSignedDepositSingle(bytes calldata encodedData, DepositParams calldata, address userAccount, uint16)
-        external
-        payable
-        override
-        requiresExecutor
-        lock
-    {
-        _executeSigned(encodedData, userAccount);
-    }
-
-    ///  @inheritdoc IRootRouter
-    function executeSignedDepositMultiple(
-        bytes calldata encodedData,
-        DepositMultipleParams calldata,
-        address userAccount,
-        uint16
-    ) external payable override requiresExecutor lock {
-        _executeSigned(encodedData, userAccount);
-    }
-
-    /**
-     *  @dev FuncIDs
-     *
-     *  FUNC ID      | FUNC NAME
-     *  0x01         |  multicallNoOutput
-     *  0x02         |  multicallSingleOutput
-     *  0x03         |  multicallMultipleOutput
-     */
-    function _executeSigned(bytes calldata encodedData, address userAccount) internal {
         // Parse funcId
         bytes1 funcId = encodedData[0];
 
@@ -361,17 +275,12 @@ contract MulticallRootRouter is IRootRouter, Ownable {
             // Make requested calls
             IVirtualAccount(userAccount).call(calls);
 
-            // use amountOut == CONTRACT_BALANCE as a flag to swap the entire balance of the contract
-            if (outputParams.amountOut == CONTRACT_BALANCE) {
-                outputParams.amountOut = outputParams.outputToken.balanceOf(userAccount);
-            }
-
             // Withdraw assets from Virtual Account
             IVirtualAccount(userAccount).withdrawERC20(outputParams.outputToken, outputParams.amountOut);
 
             // Bridge Out assets
             _approveAndCallOut(
-                outputParams.settlementOwner,
+                IVirtualAccount(userAccount).userAddress(),
                 outputParams.recipient,
                 outputParams.outputToken,
                 outputParams.amountOut,
@@ -395,11 +304,6 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
             // Withdraw assets from Virtual Account
             for (uint256 i = 0; i < outputParams.outputTokens.length;) {
-                // use amountOut == CONTRACT_BALANCE as a flag to swap the entire balance of the contract
-                if (outputParams.amountsOut[i] == CONTRACT_BALANCE) {
-                    outputParams.amountsOut[i] = outputParams.outputTokens[i].balanceOf(userAccount);
-                }
-
                 IVirtualAccount(userAccount).withdrawERC20(outputParams.outputTokens[i], outputParams.amountsOut[i]);
 
                 unchecked {
@@ -409,7 +313,184 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
             // Bridge Out assets
             _approveMultipleAndCallOut(
-                outputParams.settlementOwner,
+                IVirtualAccount(userAccount).userAddress(),
+                outputParams.recipient,
+                outputParams.outputTokens,
+                outputParams.amountsOut,
+                outputParams.depositsOut,
+                dstChainId,
+                gasParams
+            );
+            /// UNRECOGNIZED FUNC ID
+        } else {
+            revert UnrecognizedFunctionId();
+        }
+    }
+
+    /**
+     *  @inheritdoc IRootRouter
+     *  @dev FuncIDs
+     *
+     *  FUNC ID      | FUNC NAME
+     *  0x01         |  multicallNoOutput
+     *  0x02         |  multicallSingleOutput
+     *  0x03         |  multicallMultipleOutput
+     *
+     */
+    function executeSignedDepositSingle(bytes calldata encodedData, DepositParams calldata, address userAccount, uint16)
+        external
+        payable
+        override
+        requiresExecutor
+        lock
+    {
+        // Parse funcId
+        bytes1 funcId = encodedData[0];
+
+        /// FUNC ID: 1 (multicallNoOutput)
+        if (funcId == 0x01) {
+            // Decode Params
+            Call[] memory calls = abi.decode(_decode(encodedData[1:]), (Call[]));
+
+            // Make requested calls
+            IVirtualAccount(userAccount).call(calls);
+
+            /// FUNC ID: 2 (multicallSingleOutput)
+        } else if (funcId == 0x02) {
+            // Decode Params
+            (Call[] memory calls, OutputParams memory outputParams, uint16 dstChainId, GasParams memory gasParams) =
+                abi.decode(_decode(encodedData[1:]), (Call[], OutputParams, uint16, GasParams));
+
+            // Make requested calls
+            IVirtualAccount(userAccount).call(calls);
+
+            // Withdraw assets from Virtual Account
+            IVirtualAccount(userAccount).withdrawERC20(outputParams.outputToken, outputParams.amountOut);
+
+            // Bridge Out assets
+            _approveAndCallOut(
+                IVirtualAccount(userAccount).userAddress(),
+                outputParams.recipient,
+                outputParams.outputToken,
+                outputParams.amountOut,
+                outputParams.depositOut,
+                dstChainId,
+                gasParams
+            );
+
+            /// FUNC ID: 3 (multicallMultipleOutput)
+        } else if (funcId == 0x03) {
+            // Decode Params
+            (
+                Call[] memory calls,
+                OutputMultipleParams memory outputParams,
+                uint16 dstChainId,
+                GasParams memory gasParams
+            ) = abi.decode(_decode(encodedData[1:]), (Call[], OutputMultipleParams, uint16, GasParams));
+
+            // Make requested calls
+            IVirtualAccount(userAccount).call(calls);
+
+            // Withdraw assets from Virtual Account
+            for (uint256 i = 0; i < outputParams.outputTokens.length;) {
+                IVirtualAccount(userAccount).withdrawERC20(outputParams.outputTokens[i], outputParams.amountsOut[i]);
+
+                unchecked {
+                    ++i;
+                }
+            }
+
+            // Bridge Out assets
+            _approveMultipleAndCallOut(
+                IVirtualAccount(userAccount).userAddress(),
+                outputParams.recipient,
+                outputParams.outputTokens,
+                outputParams.amountsOut,
+                outputParams.depositsOut,
+                dstChainId,
+                gasParams
+            );
+            /// UNRECOGNIZED FUNC ID
+        } else {
+            revert UnrecognizedFunctionId();
+        }
+    }
+
+    /**
+     *  @inheritdoc IRootRouter
+     *  @dev FuncIDs
+     *
+     *  FUNC ID      | FUNC NAME
+     *  0x01         |  multicallNoOutput
+     *  0x02         |  multicallSingleOutput
+     *  0x03         |  multicallMultipleOutput
+     *
+     */
+    function executeSignedDepositMultiple(
+        bytes calldata encodedData,
+        DepositMultipleParams calldata,
+        address userAccount,
+        uint16
+    ) external payable override requiresExecutor lock {
+        // Parse funcId
+        bytes1 funcId = encodedData[0];
+
+        /// FUNC ID: 1 (multicallNoOutput)
+        if (funcId == 0x01) {
+            // Decode Params
+            Call[] memory calls = abi.decode(_decode(encodedData[1:]), (Call[]));
+
+            // Make requested calls
+            IVirtualAccount(userAccount).call(calls);
+
+            /// FUNC ID: 2 (multicallSingleOutput)
+        } else if (funcId == 0x02) {
+            // Decode Params
+            (Call[] memory calls, OutputParams memory outputParams, uint16 dstChainId, GasParams memory gasParams) =
+                abi.decode(_decode(encodedData[1:]), (Call[], OutputParams, uint16, GasParams));
+
+            // Make requested calls
+            IVirtualAccount(userAccount).call(calls);
+
+            // Withdraw assets from Virtual Account
+            IVirtualAccount(userAccount).withdrawERC20(outputParams.outputToken, outputParams.amountOut);
+
+            // Bridge Out assets
+            _approveAndCallOut(
+                IVirtualAccount(userAccount).userAddress(),
+                outputParams.recipient,
+                outputParams.outputToken,
+                outputParams.amountOut,
+                outputParams.depositOut,
+                dstChainId,
+                gasParams
+            );
+
+            /// FUNC ID: 3 (multicallMultipleOutput)
+        } else if (funcId == 0x03) {
+            // Decode Params
+            (
+                Call[] memory calls,
+                OutputMultipleParams memory outputParams,
+                uint16 dstChainId,
+                GasParams memory gasParams
+            ) = abi.decode(_decode(encodedData[1:]), (Call[], OutputMultipleParams, uint16, GasParams));
+
+            // Make requested calls
+            IVirtualAccount(userAccount).call(calls);
+
+            // Withdraw assets from Virtual Account
+            for (uint256 i = 0; i < outputParams.outputTokens.length;) {
+                IVirtualAccount(userAccount).withdrawERC20(outputParams.outputTokens[i], outputParams.amountsOut[i]);
+
+                unchecked {
+                    ++i;
+                }
+            }
+
+            // Bridge Out assets
+            _approveMultipleAndCallOut(
+                IVirtualAccount(userAccount).userAddress(),
                 outputParams.recipient,
                 outputParams.outputTokens,
                 outputParams.amountsOut,
@@ -428,8 +509,9 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     ///////////////////////////////////////////////////////////////*/
 
     /**
-     *  @notice Function to perform a set of actions on the omnichain environment without using the user's Virtual Acccount.
-     *  @param calls to be executed.
+     *   @notice Function to perform a set of actions on the omnichain environment without using the user's Virtual Acccount.
+     *   @param calls to be executed.
+     *
      */
     function _multicall(IMulticall.Call[] memory calls)
         internal
@@ -443,16 +525,16 @@ contract MulticallRootRouter is IRootRouter, Ownable {
                         INTERNAL HOOKS
     ////////////////////////////////////////////////////////////*/
     /**
-     *  @notice Function to approve token spend before Bridge Agent interaction to Bridge Out of omnichain environment.
-     *  @param settlementOwner settlement owner and excess gas receiver.
-     *  @param recipient Address to receive the output assets.
+     *  @notice Function to call 'clearToken' on the Root Port.
+     *  @param refundee settlement owner adn excess gas receiver.
+     *  @param recipient Address to receive the output hTokens.
      *  @param outputToken Address of the output hToken.
      *  @param amountOut Amount of output hTokens to send.
      *  @param depositOut Amount of output hTokens to deposit.
      *  @param dstChainId Chain Id of the destination chain.
      */
     function _approveAndCallOut(
-        address settlementOwner,
+        address refundee,
         address recipient,
         address outputToken,
         uint256 amountOut,
@@ -468,7 +550,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
         //Move output hTokens from Root to Branch and call 'clearToken'.
         IBridgeAgent(_bridgeAgentAddress).callOutAndBridge{value: msg.value}(
-            payable(settlementOwner),
+            payable(refundee),
             recipient,
             dstChainId,
             "",
@@ -479,16 +561,16 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     /**
-     *  @notice Function to approve multiple token spend before Bridge Agent interaction to Bridge Out of omnichain environment.
-     *  @param settlementOwner settlement owner and excess gas receiver.
-     *  @param recipient Address to receive the output assets.
+     *  @notice Function to approve token spend before Bridge Agent interaction to Bridge Out of omnichain environment.
+     *  @param refundee settlement owner adn excess gas receiver.
+     *  @param recipient Address to receive the output tokens.
      *  @param outputTokens Addresses of the output hTokens.
      *  @param amountsOut Total amount of tokens to send.
      *  @param depositsOut Amounts of tokens to withdraw from the destination port.
      *
      */
     function _approveMultipleAndCallOut(
-        address settlementOwner,
+        address refundee,
         address recipient,
         address[] memory outputTokens,
         uint256[] memory amountsOut,
@@ -510,7 +592,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
         //Move output hTokens from Root to Branch and call 'clearTokens'.
         IBridgeAgent(_bridgeAgentAddress).callOutAndBridgeMultiple{value: msg.value}(
-            payable(settlementOwner),
+            payable(refundee),
             recipient,
             dstChainId,
             "",
@@ -540,10 +622,15 @@ contract MulticallRootRouter is IRootRouter, Ownable {
         _unlocked = 1;
     }
 
-    /// @notice Verifies the caller is the Bridge Agent Executor.
+    /// @notice Modifier verifies the caller is the Bridge Agent Executor.
     modifier requiresExecutor() {
-        if (msg.sender != bridgeAgentExecutorAddress) revert UnrecognizedBridgeAgentExecutor();
+        _requiresExecutor();
         _;
+    }
+
+    /// @notice Verifies the caller is the Bridge Agent Executor. Internal function used in modifier to reduce contract bytesize.
+    function _requiresExecutor() internal view {
+        if (msg.sender != bridgeAgentExecutorAddress) revert UnrecognizedBridgeAgentExecutor();
     }
 
     /// @notice Verifies the caller is the Bridge Agent Executor.
