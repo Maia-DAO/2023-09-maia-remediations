@@ -207,6 +207,12 @@ interface IBranchPort {
      */
     function setCoreBranchRouter(address _coreBranchRouter, address _coreBranchBridgeAgent) external;
 
+    /**
+     * @notice Allows governance to claim any native tokens accumulated from failed transactions.
+     *  @param _recipient address to transfer ETH to.
+     */
+    function sweep(address _recipient) external;
+
     /*///////////////////////////////////////////////////////////////
                             EVENTS
     //////////////////////////////////////////////////////////////*/

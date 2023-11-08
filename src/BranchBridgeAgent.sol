@@ -12,10 +12,10 @@ import {
     DepositMultipleInput,
     GasParams,
     IBranchBridgeAgent,
-    ILayerZeroReceiver,
     SettlementMultipleParams
 } from "./interfaces/IBranchBridgeAgent.sol";
 import {ILayerZeroEndpoint} from "./interfaces/ILayerZeroEndpoint.sol";
+import {ILayerZeroReceiver} from "./interfaces/ILayerZeroReceiver.sol";
 
 import {BranchBridgeAgentExecutor, DeployBranchBridgeAgentExecutor} from "./BranchBridgeAgentExecutor.sol";
 
@@ -596,21 +596,30 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
                     LAYER ZERO EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILayerZeroReceiver
-    function lzReceive(uint16, bytes calldata _srcAddress, uint64, bytes calldata _payload) public override {
-        address(this).excessivelySafeCall(
+    /// @inheritdoc IBranchBridgeAgent
+    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64, bytes calldata _payload)
+        public
+        override
+        returns (bool success)
+    {
+        // Perform Excessively Safe Call
+        (success,) = address(this).excessivelySafeCall(
             gasleft(),
             150,
-            abi.encodeWithSelector(this.lzReceiveNonBlocking.selector, msg.sender, _srcAddress, _payload)
+            abi.encodeWithSelector(this.lzReceiveNonBlocking.selector, msg.sender, _srcChainId, _srcAddress, _payload)
         );
+
+        // Check if call was successful if not send any native tokens to rootPort
+        if (!success) localPortAddress.call{value: address(this).balance}("");
     }
 
     /// @inheritdoc IBranchBridgeAgent
-    function lzReceiveNonBlocking(address _endpoint, bytes calldata _srcAddress, bytes calldata _payload)
-        public
-        override
-        requiresEndpoint(_endpoint, _srcAddress)
-    {
+    function lzReceiveNonBlocking(
+        address _endpoint,
+        uint16 _srcChainId,
+        bytes calldata _srcAddress,
+        bytes calldata _payload
+    ) public override requiresEndpoint(_srcChainId, _endpoint, _srcAddress) {
         //Save Action Flag
         bytes1 flag = _payload[0] & 0x7F;
 
@@ -952,21 +961,26 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
     }
 
     /// @notice Modifier verifies the caller is the Layerzero Enpoint or Local Branch Bridge Agent.
-    modifier requiresEndpoint(address _endpoint, bytes calldata _srcAddress) {
-        _requiresEndpoint(_endpoint, _srcAddress);
+    modifier requiresEndpoint(uint16 _srcChainId, address _endpoint, bytes calldata _srcAddress) {
+        _requiresEndpoint(_srcChainId, _endpoint, _srcAddress);
         _;
     }
 
     /// @notice Internal function for caller verification. To be overwritten in `ArbitrumBranchBridgeAgent'.
-    function _requiresEndpoint(address _endpoint, bytes calldata _srcAddress) internal view virtual {
+    function _requiresEndpoint(uint16 _srcChainId, address _endpoint, bytes calldata _srcAddress)
+        internal
+        view
+        virtual
+    {
         //Verify Endpoint
         if (msg.sender != address(this)) revert LayerZeroUnauthorizedEndpoint();
         if (_endpoint != lzEndpointAddress) revert LayerZeroUnauthorizedEndpoint();
 
         //Verify Remote Caller
+        if (_srcChainId != rootChainId) revert LayerZeroUnauthorizedCaller();
         if (_srcAddress.length != 40) revert LayerZeroUnauthorizedCaller();
         if (rootBridgeAgentAddress != address(uint160(bytes20(_srcAddress[20:])))) revert LayerZeroUnauthorizedCaller();
-    }
+            }
 
     /// @notice Modifier that verifies caller is Branch Bridge Agent's Router.
     modifier requiresRouter() {

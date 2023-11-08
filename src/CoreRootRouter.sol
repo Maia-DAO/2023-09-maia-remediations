@@ -264,6 +264,29 @@ contract CoreRootRouter is IRootRouter, Ownable {
         );
     }
 
+    /**
+     * @notice Allows governance to claim any native tokens accumulated from failed transactions.
+     *  @param _refundee Receiver of any excess msg.value sent to Layer Zero on source chain.
+     *  @param _recipient address to transfer ETH to on destination chain.
+     *  @param _gParams gasParameters for remote execution
+     */
+    function sweep(address _refundee, address _recipient, uint16 _dstChainId, GasParams calldata _gParams)
+        external
+        payable
+        onlyOwner
+    {
+        // Encode CallData
+        bytes memory params = abi.encode(_recipient);
+
+        // Pack funcId into data
+        bytes memory payload = abi.encodePacked(bytes1(0x08), params);
+
+        //Sweep native tokens from branch port
+        IBridgeAgent(bridgeAgentAddress).callOut{value: msg.value}(
+            payable(_refundee), _recipient, _dstChainId, payload, _gParams
+        );
+    }
+
     /// @inheritdoc IRootRouter
     function retrySettlement(uint32, address, bytes calldata, GasParams calldata, bool) external payable override {
         revert();

@@ -178,7 +178,7 @@ interface IRootPort {
      * @param _from sender of the hTokens to burn.
      * @param _hToken address of the hToken to burn.
      * @param _amount amount of hTokens to burn.
-* @param _srcChainId The chainId of the chain where the token is deployed.
+     * @param _srcChainId The chainId of the chain where the token is deployed.
      */
     function burn(address _from, address _hToken, uint256 _amount, uint256 _srcChainId) external;
 
@@ -188,7 +188,7 @@ interface IRootPort {
      * @param _hToken address of the hToken to bridge.
      * @param _amount amount of hTokens to bridge.
      * @param _deposit amount of underlying tokens to deposit.
-* @param _srcChainId The chainId of the chain where the token is deployed.
+     * @param _srcChainId The chainId of the chain where the token is deployed.
      */
     function bridgeToRoot(address _recipient, address _hToken, uint256 _amount, uint256 _deposit, uint256 _srcChainId)
         external;
@@ -269,7 +269,7 @@ interface IRootPort {
     function toggleVirtualAccountApproved(VirtualAccount _userAccount, address _router) external;
 
     /*///////////////////////////////////////////////////////////////
-                    BRIDGE AGENT MANAGEMENT FUNCTIONS
+                        BRIDGE AGENT MANAGEMENT FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -362,16 +362,20 @@ interface IRootPort {
     function syncNewCoreBranchRouter(address _coreBranchRouter, address _coreBranchBridgeAgent, uint16 _dstChainId)
         external;
 
-        /*///////////////////////////////////////////////////////////////
+    /**
+     * @notice Allows governance to claim any native tokens accumulated from failed transactions.
+     *  @param _recipient address to transfer ETH to.
+     */
+    function sweep(address _recipient) external;
+
+    /*///////////////////////////////////////////////////////////////
                             EVENTS
     //////////////////////////////////////////////////////////////*/
-
-    // TODO: Add Natspec here
 
     event BridgeAgentFactoryAdded(address indexed bridgeAgentFactory);
     event BridgeAgentFactoryToggled(address indexed bridgeAgentFactory);
 
-event BridgeAgentAdded(address indexed bridgeAgent, address indexed manager);
+    event BridgeAgentAdded(address indexed bridgeAgent, address indexed manager);
     event BridgeAgentToggled(address indexed bridgeAgent);
     event BridgeAgentSynced(address indexed bridgeAgent, address indexed rootBridgeAgent, uint256 indexed srcChainId);
 
@@ -384,7 +388,6 @@ event BridgeAgentAdded(address indexed bridgeAgent, address indexed manager);
     );
     event GlobalTokenAdded(address indexed localAddress, address indexed globalAddress, uint256 indexed chainId);
     event EcosystemTokenAdded(address indexed ecoTokenGlobalAddress);
-
     event CoreRootSet(address indexed coreRootRouter, address indexed coreRootBridgeAgent);
     event CoreBranchSet(
         address indexed coreBranchRouter, address indexed coreBranchBridgeAgent, uint16 indexed dstChainId
@@ -396,8 +399,6 @@ event BridgeAgentAdded(address indexed bridgeAgent, address indexed manager);
     /*///////////////////////////////////////////////////////////////
                             ERRORS  
     //////////////////////////////////////////////////////////////*/
-
-    // TODO: Add Natspec here
 
     error InvalidGlobalAddress();
     error InvalidLocalAddress();

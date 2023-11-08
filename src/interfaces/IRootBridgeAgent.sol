@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ILayerZeroReceiver} from "./ILayerZeroReceiver.sol";
-
 import {
     GasParams,
     DepositParams,
@@ -89,7 +87,7 @@ import {
  *            BridgeAgentExecutor (txExecuted)
  *
  */
-interface IRootBridgeAgent is ILayerZeroReceiver {
+interface IRootBridgeAgent {
     /*///////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -297,6 +295,18 @@ interface IRootBridgeAgent is ILayerZeroReceiver {
     /*///////////////////////////////////////////////////////////////
                             LAYER ZERO FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /**
+        * @notice External function to receive cross-chain messages from LayerZero Endpoint Contract.
+        *   @param _srcChainId Chain ID of the sender.
+        *   @param _srcAddress address path of the recipient + sender.
+        *   @param _nonce Nonce of the message.
+        *   @param _payload Calldata for function call.
+        *  @return bool True if the message was successfully received.
+     */
+    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64 _nonce, bytes calldata _payload)
+        external
+        returns (bool);
 
     /**
      * @notice External function to receive cross-chain messages from LayerZero Endpoint Contract without blocking.

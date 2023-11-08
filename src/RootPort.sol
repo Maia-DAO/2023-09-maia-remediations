@@ -549,6 +549,11 @@ contract RootPort is Ownable, IRootPort {
         emit CoreBranchSynced(_coreBranchRouter, _coreBranchBridgeAgent, _dstChainId);
     }
 
+    /// @inheritdoc IRootPort
+    function sweep(address _recipient) external override onlyOwner {
+        // Safe Transfer All ETH
+        _recipient.safeTransferAllETH();
+    }
     /*///////////////////////////////////////////////////////////////
                                 MODIFIERS
     //////////////////////////////////////////////////////////////*/

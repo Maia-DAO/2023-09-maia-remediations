@@ -119,7 +119,7 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
             /// _removeBranchBridgeAgent
         } else if (_params[0] == 0x04) {
-
+            
             /// _manageStrategyToken
         } else if (_params[0] == 0x05) {
             (address underlyingToken, uint256 minimumReservesRatio) = abi.decode(_params[1:], (address, uint256));
@@ -138,6 +138,12 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
             (address coreBranchRouter, address coreBranchBridgeAgent) = abi.decode(_params[1:], (address, address));
 
             IPort(localPortAddress).setCoreBranchRouter(coreBranchRouter, coreBranchBridgeAgent);
+
+            /// _sweep
+        } else if (_params[0] == 0x08) {
+            (address recipient) = abi.decode(_params[1:], (address));
+
+            IPort(localPortAddress).sweep(recipient);
 
             /// Unrecognized Function Selector
         } else {

@@ -6,6 +6,7 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {ExcessivelySafeCall} from "lib/ExcessivelySafeCall.sol";
 
 import {ILayerZeroEndpoint} from "./interfaces/ILayerZeroEndpoint.sol";
+import {ILayerZeroReceiver} from "./interfaces/ILayerZeroReceiver.sol";
 
 import {IBranchBridgeAgent} from "./interfaces/IBranchBridgeAgent.sol";
 import {IERC20hTokenRoot} from "./interfaces/IERC20hTokenRoot.sol";
@@ -15,7 +16,6 @@ import {
     GasParams,
     DepositParams,
     DepositMultipleParams,
-    ILayerZeroReceiver,
     IRootBridgeAgent,
     Settlement,
     SettlementInput,
@@ -427,15 +427,20 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
                     LAYER ZERO EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ILayerZeroReceiver
-    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64, bytes calldata _payload) public {
-        (bool success,) = address(this).excessivelySafeCall(
+    /// @inheritdoc IRootBridgeAgent
+    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64, bytes calldata _payload)
+        public
+        returns (bool success)
+    {
+        // Perform Excessively Safe Call
+        (success,) = address(this).excessivelySafeCall(
             gasleft(),
             150,
             abi.encodeWithSelector(this.lzReceiveNonBlocking.selector, msg.sender, _srcChainId, _srcAddress, _payload)
         );
 
-        if (!success) if (msg.sender == getBranchBridgeAgent[localChainId]) revert ExecutionFailure();
+        // Check if call was successful if not send any native tokens to rootPort
+        if (!success) localPortAddress.call{value: address(this).balance}("");
     }
 
     /// @inheritdoc IRootBridgeAgent

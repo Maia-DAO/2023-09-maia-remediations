@@ -32,10 +32,9 @@ library DeployArbitrumBranchBridgeAgent {
  */
 contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
     using SafeTransferLib for address payable;
-
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Arbitrum Branch Bridge Agent.
@@ -62,12 +61,12 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
 
     /*///////////////////////////////////////////////////////////////
                         USER EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to deposit a single asset to the local Port.
-     *   @param underlyingAddress address of the underlying asset to be deposited.
-     *   @param amount amount to be deposited.
+     *  @param underlyingAddress address of the underlying asset to be deposited.
+     *  @param amount amount to be deposited.
      *
      */
     function depositToPort(address underlyingAddress, uint256 amount) external payable lock {
@@ -75,18 +74,18 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
     }
 
     /**
-     * @notice Function to withdraw a single asset to the local Port.
-     *   @param localAddress local hToken to be withdrawn.
-     *   @param amount amount to be withdrawn.
+     * @notice Function to withdraw a single asset from the local Port.
+     *  @param globalAddress local hToken to be withdrawn.
+     *  @param amount amount to be withdrawn.
      *
      */
-    function withdrawFromPort(address localAddress, uint256 amount) external payable lock {
-        IArbPort(localPortAddress).withdrawFromPort(msg.sender, msg.sender, localAddress, amount);
+    function withdrawFromPort(address globalAddress, uint256 amount) external payable lock {
+        IArbPort(localPortAddress).withdrawFromPort(msg.sender, msg.sender, globalAddress, amount);
     }
 
     /*///////////////////////////////////////////////////////////////
                     SETTLEMENT EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBranchBridgeAgent
     /// @dev This functionality should be accessed from Root environment
@@ -94,19 +93,20 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
 
     /*///////////////////////////////////////////////////////////////
                     LAYER ZERO INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Internal function performs the call to LayerZero messaging layer Endpoint for cross-chain messaging.
-     *   @param _calldata params for root bridge agent execution.
+     *  @param _calldata params for root bridge agent execution.
      */
     function _performCall(address payable, bytes memory _calldata, GasParams calldata) internal override {
-        // Cache Root Bridge Agent Address
-        address _rootBridgeAgentAddress = rootBridgeAgentAddress;
-        // Send Gas to Root Bridge Agent
-        _rootBridgeAgentAddress.call{value: msg.value}("");
-        // Execute locally
-        IRootBridgeAgent(_rootBridgeAgentAddress).lzReceive(rootChainId, "", 0, _calldata);
+        // Send gas to rootBridgeAgentAddress
+        payable(rootBridgeAgentAddress).safeTransferAllETH();
+
+        // Execute locally and check for execution failure
+        if (!IRootBridgeAgent(rootBridgeAgentAddress).lzReceive(rootChainId, "", 0, _calldata)) {
+            revert ExecutionFailure();
+        }
     }
 
     /**
@@ -119,18 +119,23 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
         _refundee.safeTransferAllETH();
 
         // Reopen Settlement on Root Bridge Agent
-        IRootBridgeAgent(rootBridgeAgentAddress).lzReceive(
-            rootChainId, "", 0, abi.encodePacked(bytes1(0x09), _settlementNonce)
-        );
+        if (
+            !IRootBridgeAgent(rootBridgeAgentAddress).lzReceive(
+                rootChainId, "", 0, abi.encodePacked(bytes1(0x09), _settlementNonce)
+            )
+        ) revert ExecutionFailure();
     }
 
     /*///////////////////////////////////////////////////////////////
                         MODIFIER INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Verifies the caller is the Root Bridge Agent.
-    /// @dev Internal function used in modifier to reduce contract bytesize.
-    function _requiresEndpoint(address _endpoint, bytes calldata) internal view override {
+    /**
+     * @notice Verifies the caller is the Root Bridge Agent.
+     *  @param _endpoint address of the endpoint to be verified.
+     *  @dev Internal function used in modifier to reduce contract bytesize.
+     */
+    function _requiresEndpoint(uint16, address _endpoint, bytes calldata) internal view override {
         if (msg.sender != address(this)) revert LayerZeroUnauthorizedEndpoint();
         if (_endpoint != rootBridgeAgentAddress) revert LayerZeroUnauthorizedEndpoint();
     }

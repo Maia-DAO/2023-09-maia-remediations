@@ -120,20 +120,13 @@ contract BranchPort is Ownable, IBranchPort {
      *   @param _bridgeAgentFactory Address of the Bridge Agent Factory.
      */
     function initialize(address _coreBranchRouter, address _bridgeAgentFactory) external virtual onlyOwner {
-        require(coreBranchRouterAddress == address(0), "Contract already initialized");
-        require(!isBridgeAgentFactory[_bridgeAgentFactory], "Contract already initialized");
-
         require(_coreBranchRouter != address(0), "CoreBranchRouter is zero address");
         require(_bridgeAgentFactory != address(0), "BridgeAgentFactory is zero address");
+        renounceOwnership();
 
         coreBranchRouterAddress = _coreBranchRouter;
         isBridgeAgentFactory[_bridgeAgentFactory] = true;
         bridgeAgentFactories.push(_bridgeAgentFactory);
-    }
-
-    /// @notice Function being overrriden to prevent mistakenly renouncing ownership.
-    function renounceOwnership() public payable override onlyOwner {
-        revert("Cannot renounce ownership");
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -416,6 +409,12 @@ contract BranchPort is Ownable, IBranchPort {
         emit CoreBranchSet(_coreBranchRouter, _coreBranchBridgeAgent);
     }
 
+    /// @inheritdoc IBranchPort
+    function sweep(address _recipient) external override requiresCoreRouter {
+        // Safe Transfer All ETH
+        _recipient.safeTransferAllETH();
+    }
+
     /*///////////////////////////////////////////////////////////////
                     INTERNAL VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -511,14 +510,14 @@ contract BranchPort is Ownable, IBranchPort {
         uint256 _amount,
         uint256 _deposit
     ) internal virtual {
-        // Cache hToken amount out
+// Cache hToken amount out
         uint256 _hTokenAmount = _amount - _deposit;
 
         // Check if hTokens are being bridged out
         if (_hTokenAmount > 0) {
-            _localAddress.safeTransferFrom(_depositor, address(this), _hTokenAmount);
-            ERC20hTokenBranch(_localAddress).burn(_hTokenAmount);
-        }
+                _localAddress.safeTransferFrom(_depositor, address(this), _hTokenAmount);
+                ERC20hTokenBranch(_localAddress).burn(_hTokenAmount);
+                    }
 
         // Check if underlying tokens are being bridged out
         if (_deposit > 0) {
