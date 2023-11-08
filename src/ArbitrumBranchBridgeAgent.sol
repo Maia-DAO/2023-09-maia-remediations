@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+
 import {IArbitrumBranchPort as IArbPort} from "./interfaces/IArbitrumBranchPort.sol";
 import {IRootBridgeAgent} from "./interfaces/IRootBridgeAgent.sol";
 import {GasParams, IBranchBridgeAgent} from "./interfaces/IBranchBridgeAgent.sol";
@@ -29,6 +31,8 @@ library DeployArbitrumBranchBridgeAgent {
  *         connecting Arbitrum Branch Chain contracts and the root omnichain environment.
  */
 contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
+    using SafeTransferLib for address payable;
+
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -107,10 +111,14 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
 
     /**
      * @notice Internal function performs the call to Layerzero Endpoint Contract for cross-chain messaging.
-     *   @param _settlementNonce root settlement nonce to fallback.
+     *  @param _refundee address to refund gas to.
+     *  @param _settlementNonce root settlement nonce to fallback.
      */
-    function _performFallbackCall(address payable, uint32 _settlementNonce) internal override {
-        //Sends message to Root Bridge Agent
+    function _performFallbackCall(address payable _refundee, uint32 _settlementNonce) internal override {
+        // Send gas to refundee
+        _refundee.safeTransferAllETH();
+
+        // Reopen Settlement on Root Bridge Agent
         IRootBridgeAgent(rootBridgeAgentAddress).lzReceive(
             rootChainId, "", 0, abi.encodePacked(bytes1(0x09), _settlementNonce)
         );
