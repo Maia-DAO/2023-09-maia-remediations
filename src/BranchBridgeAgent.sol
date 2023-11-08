@@ -453,7 +453,7 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
     }
 
     /// @inheritdoc IBranchBridgeAgent
-    function redeemDeposit(uint32 _depositNonce) external override lock {
+    function redeemDeposit(uint32 _depositNonce, address _recipient) external override lock {
         // Get storage reference
         Deposit storage deposit = getDeposit[_depositNonce];
 
@@ -467,7 +467,10 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
 
         // Transfer token to depositor / user
         for (uint256 i = 0; i < deposit.tokens.length;) {
-            _clearToken(msg.sender, deposit.hTokens[i], deposit.tokens[i], deposit.amounts[i], deposit.deposits[i]);
+            //Increment tokens clearance counter if address is zero
+            if (deposit.hTokens[i] != address(0)) {
+                _clearToken(_recipient, deposit.hTokens[i], deposit.tokens[i], deposit.amounts[i], deposit.deposits[i]);
+            }
 
             unchecked {
                 ++i;
@@ -477,6 +480,60 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         // Delete Failed Deposit Token Info
         delete getDeposit[_depositNonce];
     }
+
+    /// @inheritdoc IBranchBridgeAgent
+    function redeemDeposit(uint32 _depositNonce, address _recipient, address _localTokenAddress)
+        external
+        override
+        lock
+    {
+        // Check localTokenAddress not zero
+        if (_localTokenAddress == address(0)) revert InvalidLocalAddress();
+
+        // Get storage reference
+        Deposit storage deposit = getDeposit[_depositNonce];
+
+        // Check Deposit
+        if (deposit.status == STATUS_SUCCESS) revert DepositRedeemUnavailable();
+        if (deposit.owner == address(0)) revert DepositRedeemUnavailable();
+        if (deposit.owner != msg.sender) revert NotDepositOwner();
+
+        // Clearance counter
+        uint256 tokensCleared;
+
+        // Cache Length
+        uint256 length = deposit.tokens.length;
+
+        // Transfer token to depositor / user
+        for (uint256 i = 0; i < length;) {
+            // Check if hToken is the same as localTokenAddress
+            if (deposit.hTokens[i] == _localTokenAddress) {
+                // Clear Tokens back to user
+                _clearToken(_recipient, deposit.hTokens[i], deposit.tokens[i], deposit.amounts[i], deposit.deposits[i]);
+
+                // Remove Token Related Info from Deposit Storage
+                delete deposit.hTokens[i];
+                delete deposit.tokens[i];
+                delete deposit.amounts[i];
+                delete deposit.deposits[i];
+            }
+
+            //Increment tokens clearance counter if address is zero
+            if (deposit.hTokens[i] == address(0)) {
+                unchecked {
+                    ++tokensCleared;
+                }
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Check if all tokens have been cleared and Delete Failed Deposit Token Info
+        if (tokensCleared == length) delete getDeposit[_depositNonce];
+    }
+
 
     /*///////////////////////////////////////////////////////////////
                     SETTLEMENT EXTERNAL FUNCTIONS

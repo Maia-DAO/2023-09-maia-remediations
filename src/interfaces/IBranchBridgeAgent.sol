@@ -264,10 +264,18 @@ interface IBranchBridgeAgent {
 
     /**
      * @notice External function to retry a failed Deposit entry on this branch chain.
-     *    @param depositNonce Identifier for user deposit.
-     *
+     *  @param depositNonce Identifier for user deposit.
+     *  @param recipient address to receive the redeemed tokens.
      */
-    function redeemDeposit(uint32 depositNonce) external;
+    function redeemDeposit(uint32 depositNonce, address recipient) external;
+
+    /**
+     * @notice External function to retry a failed Deposit entry on this branch chain.
+     *  @param depositNonce Identifier for user deposit.
+     *  @param recipient address to receive the redeemed tokens.
+     *  @param localTokenAddress address of the local token to redeem.
+     */
+    function redeemDeposit(uint32 depositNonce, address recipient, address localTokenAddress) external;
 
     /*///////////////////////////////////////////////////////////////
                     SETTLEMENT EXTERNAL FUNCTIONS
@@ -370,4 +378,6 @@ interface IBranchBridgeAgent {
 
     error UnrecognizedRouter();
     error UnrecognizedBridgeAgentExecutor();
+
+    error InvalidLocalAddress();
 }
