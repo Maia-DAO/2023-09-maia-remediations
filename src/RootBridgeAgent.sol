@@ -1221,16 +1221,17 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         _;
     }
 
-    /// @notice Modifier verifies the caller is the Layerzero Enpoint or Local Branch Bridge Agent.
+     /// @notice Modifier verifies the caller is the Layerzero Enpoint or Local Branch Bridge Agent.
     modifier requiresEndpoint(address _endpoint, uint16 _srcChain, bytes calldata _srcAddress) virtual {
         if (msg.sender != address(this)) revert LayerZeroUnauthorizedEndpoint();
 
         if (_endpoint != getBranchBridgeAgent[localChainId]) {
-            if (_endpoint != lzEndpointAddress) revert LayerZeroUnauthorizedEndpoint();
+            /// @dev Allow eth_estimateGas to be called by zero address to mock layerzero's endpoint.
+            if (_endpoint != lzEndpointAddress) if (_endpoint != address(0)) revert LayerZeroUnauthorizedEndpoint();
 
             if (_srcAddress.length != 40) revert LayerZeroUnauthorizedCaller();
 
-            if (getBranchBridgeAgent[_srcChain] != address(uint160(bytes20(_srcAddress[PARAMS_ADDRESS_SIZE:])))) {
+            if (getBranchBridgeAgent[_srcChain] != address(uint160(bytes20(_srcAddress[:PARAMS_ADDRESS_SIZE])))) {
                 revert LayerZeroUnauthorizedCaller();
             }
         }

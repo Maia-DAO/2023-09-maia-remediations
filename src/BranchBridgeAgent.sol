@@ -1105,8 +1105,10 @@ contract BranchBridgeAgent is IBranchBridgeAgent, BridgeAgentConstants {
         //Verify Remote Caller
         if (_srcChainId != rootChainId) revert LayerZeroUnauthorizedCaller();
         if (_srcAddress.length != 40) revert LayerZeroUnauthorizedCaller();
-        if (rootBridgeAgentAddress != address(uint160(bytes20(_srcAddress[20:])))) revert LayerZeroUnauthorizedCaller();
-            }
+        if (rootBridgeAgentAddress != address(uint160(bytes20(_srcAddress[:PARAMS_ADDRESS_SIZE])))) {
+            revert LayerZeroUnauthorizedCaller();
+        }
+    }
 
     /// @notice Modifier that verifies caller is Branch Bridge Agent's Router.
     modifier requiresRouter() {
