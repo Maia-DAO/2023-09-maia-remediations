@@ -73,17 +73,18 @@ interface IBranchRouter {
 
     /**
      * @notice External function that returns a given deposit entry.
-     *     @param depositNonce Identifier for user deposit.
+     *   @param depositNonce Identifier for user deposit.
      *
      */
     function getDepositEntry(uint32 depositNonce) external view returns (Deposit memory);
 
-    function retryDeposit(
-        uint32 _depositNonce,
-        bytes calldata _params,
-        GasParams calldata _gParams,
-        bool _hasFallbackToggled
-    ) external payable;
+    /**
+     * @notice Function to retry a deposit that has failed.
+     *   @param _depositNonce Identifier for user deposit.
+     *   @param _params encoded router parameters to execute on the root chain.
+     *   @param _gParams gas parameters for the cross-chain call.
+     */
+    function retryDeposit(uint32 _depositNonce, bytes calldata _params, GasParams calldata _gParams) external payable;
 
     /*///////////////////////////////////////////////////////////////
                         LAYERZERO EXTERNAL FUNCTIONS
