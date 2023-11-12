@@ -148,7 +148,6 @@ contract ArbitrumCoreBranchRouter is CoreBranchRouter {
 
             /// _removeBranchBridgeAgent
         } else if (_data[0] == 0x04) {
-
             /// _manageStrategyToken
         } else if (_data[0] == 0x05) {
             (address underlyingToken, uint256 minimumReservesRatio) = abi.decode(_data[1:], (address, uint256));
@@ -159,6 +158,18 @@ contract ArbitrumCoreBranchRouter is CoreBranchRouter {
             (address portStrategy, address underlyingToken, uint256 dailyManagementLimit, bool isUpdateDailyLimit) =
                 abi.decode(_data[1:], (address, address, uint256, bool));
             _managePortStrategy(portStrategy, underlyingToken, dailyManagementLimit, isUpdateDailyLimit);
+
+            /// _setCoreBranchRouter
+        } else if (_data[0] == 0x07) {
+            (address coreBranchRouter, address coreBranchBridgeAgent) = abi.decode(_data[1:], (address, address));
+
+            IPort(localPortAddress).setCoreBranchRouter(coreBranchRouter, coreBranchBridgeAgent);
+
+            /// _sweep
+        } else if (_data[0] == 0x08) {
+            (address recipient) = abi.decode(_data[1:], (address));
+
+            IPort(localPortAddress).sweep(recipient);
 
             /// Unrecognized Function Selector
         } else {

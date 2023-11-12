@@ -50,7 +50,7 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                    INITIALIZATION FUNCTIONS
+                       INITIALIZATION FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -68,7 +68,7 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
 
 
     /*///////////////////////////////////////////////////////////////
-                        VIEW FUNCTIONS
+                            VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBranchRouter
@@ -77,7 +77,7 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        EXTERNAL FUNCTIONS
+                           EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBranchRouter
@@ -117,20 +117,19 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
     }
 
     /// @inheritdoc IBranchRouter
-    function retryDeposit(
-        uint32 _depositNonce,
-        bytes calldata _params,
-        GasParams calldata _gParams,
-        bool _hasFallbackToggled
-    ) external payable override {
+    function retryDeposit(uint32 _depositNonce, bytes calldata _params, GasParams calldata _gParams)
+        external
+        payable
+        override
+    {
         // Perform call to bridge agent.
         IBridgeAgent(localBridgeAgentAddress).retryDeposit{value: msg.value}(
-            msg.sender, _depositNonce, _params, _gParams, _hasFallbackToggled
+            msg.sender, _depositNonce, _params, _gParams
         );
     }
 
     /*///////////////////////////////////////////////////////////////
-                BRIDGE AGENT EXECUTOR EXTERNAL FUNCTIONS
+                 BRIDGE AGENT EXECUTOR EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBranchRouter
@@ -161,7 +160,7 @@ contract BaseBranchRouter is IBranchRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                            INTERNAL FUNCTIONS
+                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /**

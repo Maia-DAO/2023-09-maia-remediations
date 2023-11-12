@@ -99,10 +99,10 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
      * @notice Internal function performs the call to LayerZero messaging layer Endpoint for cross-chain messaging.
      *  @param _calldata params for root bridge agent execution.
      */
-    function _performCall(address payable, bytes memory _calldata, GasParams calldata) internal override {
-        // Send gas to rootBridgeAgentAddress
+    function _performCall(address payable, bytes memory _calldata, GasParams calldata, uint256) internal override {
+         // Send gas to rootBridgeAgentAddress
         payable(rootBridgeAgentAddress).safeTransferAllETH();
-
+        
         // Execute locally and check for execution failure
         if (!IRootBridgeAgent(rootBridgeAgentAddress).lzReceive(rootChainId, "", 0, _calldata)) {
             revert ExecutionFailure();

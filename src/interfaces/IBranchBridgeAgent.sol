@@ -121,16 +121,15 @@ interface IBranchBridgeAgent {
         returns (uint256 _fee);
 
     /*///////////////////////////////////////////////////////////////
-                    USER AND BRANCH ROUTER FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+                        BRANCH ROUTER FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to perform a call to the Root Omnichain Router without token deposit.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params enconded parameters to execute on the root chain router.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @dev DEPOSIT ID: 1 (Call without deposit)
-     *
+     *  @param gasRefundee Address to return excess gas deposited in `msg.value` to.
+     *  @param params enconded parameters to execute on the root chain router.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @dev DEPOSIT ID: 1 (Call without deposit)
      */
     function callOut(address payable gasRefundee, bytes calldata params, GasParams calldata gasParams)
         external
@@ -138,15 +137,14 @@ interface IBranchBridgeAgent {
 
     /**
      * @notice Function to perform a call to the Root Omnichain Router while depositing a single asset.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params enconded parameters to execute on the root chain router.
-     *   @param depositParams additional token deposit parameters.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @dev DEPOSIT ID: 2 (Call with single deposit)
-     *
+     *  @param depositOwnerAndGasRefundee Deposit owner and address to return excess gas deposited in `msg.value` to.
+     *  @param params enconded parameters to execute on the root chain router.
+     *  @param depositParams additional token deposit parameters.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @dev DEPOSIT ID: 2 (Call with single deposit)
      */
     function callOutAndBridge(
-        address payable gasRefundee,
+        address payable depositOwnerAndGasRefundee,
         bytes calldata params,
         DepositInput memory depositParams,
         GasParams calldata gasParams
@@ -154,15 +152,14 @@ interface IBranchBridgeAgent {
 
     /**
      * @notice Function to perform a call to the Root Omnichain Router while depositing two or more assets.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params enconded parameters to execute on the root chain router.
-     *   @param depositParams additional token deposit parameters.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @dev DEPOSIT ID: 3 (Call with multiple deposit)
-     *
+     *  @param depositOwnerAndGasRefundee Deposit owner and address to return excess gas deposited in `msg.value` to.
+     *  @param params enconded parameters to execute on the root chain router.
+     *  @param depositParams additional token deposit parameters.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @dev DEPOSIT ID: 3 (Call with multiple deposit)
      */
     function callOutAndBridgeMultiple(
-        address payable gasRefundee,
+        address payable depositOwnerAndGasRefundee,
         bytes calldata params,
         DepositMultipleInput memory depositParams,
         GasParams calldata gasParams
@@ -170,28 +167,23 @@ interface IBranchBridgeAgent {
 
     /**
      * @notice Perform a call to the Root Omnichain Router without token deposit with msg.sender information.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params enconded parameters to execute on the root chain router.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @dev DEPOSIT ID: 4 (Call without deposit and verified sender)
-     *
+     *  @dev msg.sender is gasRefundee in signed calls.
+     *  @param params enconded parameters to execute on the root chain router.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @dev DEPOSIT ID: 4 (Call without deposit and verified sender)
      */
-    function callOutSigned(address payable gasRefundee, bytes calldata params, GasParams calldata gasParams)
-        external
-        payable;
+    function callOutSigned(bytes calldata params, GasParams calldata gasParams) external payable;
 
     /**
      * @notice Function to perform a call to the Root Omnichain Router while depositing a single asset msg.sender.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params enconded parameters to execute on the root chain router.
-     *   @param depositParams additional token deposit parameters.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @param hasFallbackToggled flag to indicate if the fallback function was toggled.
-     *   @dev DEPOSIT ID: 5 (Call with single deposit and verified sender)
-     *
+     *  @dev msg.sender is depositOwnerAndGasRefundee in signed calls.
+     *  @param params enconded parameters to execute on the root chain router.
+     *  @param depositParams additional token deposit parameters.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @param hasFallbackToggled flag to indicate if the fallback function was toggled.
+     *  @dev DEPOSIT ID: 5 (Call with single deposit and verified sender)
      */
     function callOutSignedAndBridge(
-        address payable gasRefundee,
         bytes calldata params,
         DepositInput memory depositParams,
         GasParams calldata gasParams,
@@ -201,50 +193,45 @@ interface IBranchBridgeAgent {
     /**
      * @notice Function to perform a call to the Root Omnichain Router while
      *         depositing two or more assets with msg.sender.
-     *   @param gasRefundee address to return excess gas deposited in `msg.value` to.
-     *   @param params enconded parameters to execute on the root chain router.
-     *   @param depositParams additional token deposit parameters.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @param hasFallbackToggled flag to indicate if the fallback function was toggled.
-     *   @dev DEPOSIT ID: 6 (Call with multiple deposit and verified sender)
-     *
+     *  @dev msg.sender is depositOwnerAndGasRefundee in signed calls.
+     *  @param params enconded parameters to execute on the root chain router.
+     *  @param depositParams additional token deposit parameters.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @param hasFallbackToggled flag to indicate if the fallback function was toggled.
+     *  @dev DEPOSIT ID: 6 (Call with multiple deposit and verified sender)
      */
     function callOutSignedAndBridgeMultiple(
-        address payable gasRefundee,
         bytes calldata params,
         DepositMultipleInput memory depositParams,
         GasParams calldata gasParams,
         bool hasFallbackToggled
     ) external payable;
 
+
+    
     /*///////////////////////////////////////////////////////////////
                     DEPOSIT EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to perform a call to the Root Omnichain Environment
      *         retrying a failed non-signed deposit that hasn't been executed yet.
-     *   @param owner address of the deposit owner.
-     *   @param depositNonce Identifier for user deposit.
-     *   @param params parameters to execute on the root chain router.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @param hasFallbackToggled flag to indicate if the fallback function was toggled.
+     *  @param owner address of the deposit owner.
+     *  @param depositNonce Identifier for user deposit.
+     *  @param params parameters to execute on the root chain router.
+     *  @param gasParams gas parameters for the cross-chain call.
      */
-    function retryDeposit(
-        address owner,
-        uint32 depositNonce,
-        bytes calldata params,
-        GasParams calldata gasParams,
-        bool hasFallbackToggled
-    ) external payable;
+    function retryDeposit(address owner, uint32 depositNonce, bytes calldata params, GasParams calldata gasParams)
+        external
+        payable;
 
     /**
      * @notice Function to perform a call to the Root Omnichain Environment
      *         retrying a failed signed deposit that hasn't been executed yet.
-     *   @param depositNonce Identifier for user deposit.
-     *   @param params parameters to execute on the root chain router.
-     *   @param gasParams gas parameters for the cross-chain call.
-     *   @param hasFallbackToggled flag to indicate if the fallback function was toggled.
+     *  @param depositNonce Identifier for user deposit.
+     *  @param params parameters to execute on the root chain router.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @param hasFallbackToggled flag to indicate if the fallback function was toggled.
      */
     function retryDepositSigned(
         uint32 depositNonce,
@@ -255,10 +242,9 @@ interface IBranchBridgeAgent {
 
     /**
      * @notice External function to request tokens back to branch chain after failing omnichain environment interaction.
-     *    @param depositNonce Identifier for user deposit to retrieve.
-     *    @param gasParams gas parameters for the cross-chain call.
-     *    @dev DEPOSIT ID: 8
-     *
+     *  @param depositNonce Identifier for user deposit to retrieve.
+     *  @param gasParams gas parameters for the cross-chain call.
+     *  @dev DEPOSIT ID: 8
      */
     function retrieveDeposit(uint32 depositNonce, GasParams calldata gasParams) external payable;
 
@@ -375,6 +361,8 @@ interface IBranchBridgeAgent {
     error NotDepositOwner();
     error DepositRetryUnavailableUseCallout();
     error DepositRedeemUnavailable();
+
+    error DepositAlreadyRetrieved();
 
     error UnrecognizedRouter();
     error UnrecognizedBridgeAgentExecutor();
