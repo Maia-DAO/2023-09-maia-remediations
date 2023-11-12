@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IRootBridgeAgentFactory} from "../interfaces/IRootBridgeAgentFactory.sol";
 import {IRootPort} from "../interfaces/IRootPort.sol";
 
-import {RootBridgeAgent} from "../RootBridgeAgent.sol";
+import {DeployRootBridgeAgent, RootBridgeAgent} from "../RootBridgeAgent.sol";
 
 /// @title Root Bridge Agent Factory Contract
 /// @author MaiaDAO
@@ -20,13 +20,13 @@ contract RootBridgeAgentFactory is IRootBridgeAgentFactory {
 
     /*///////////////////////////////////////////////////////////////
                              CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Bridge Agent.
-     *     @param _rootChainId Root Chain Layer Zero Id.
-     *     @param _lzEndpointAddress Layer Zero Endpoint for cross-chain communication.
-     *     @param _rootPortAddress Root Port Address.
+     *  @param _rootChainId Root Chain Layer Zero Id.
+     *  @param _lzEndpointAddress Layer Zero Endpoint for cross-chain communication.
+     *  @param _rootPortAddress Root Port Address.
      */
     constructor(uint16 _rootChainId, address _lzEndpointAddress, address _rootPortAddress) {
         require(_rootPortAddress != address(0), "Root Port Address cannot be 0");
@@ -38,7 +38,7 @@ contract RootBridgeAgentFactory is IRootBridgeAgentFactory {
 
     /*///////////////////////////////////////////////////////////////
                 BRIDGE AGENT FACTORY EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Creates a new Root Bridge Agent.
@@ -47,14 +47,11 @@ contract RootBridgeAgentFactory is IRootBridgeAgentFactory {
      */
     function createBridgeAgent(address _newRootRouterAddress) external returns (address newBridgeAgent) {
         newBridgeAgent = address(
-            new RootBridgeAgent(
-                rootChainId, 
-                lzEndpointAddress, 
-                rootPortAddress, 
-                _newRootRouterAddress
-            )
+            DeployRootBridgeAgent.deploy(rootChainId, lzEndpointAddress, rootPortAddress, _newRootRouterAddress)
         );
 
         IRootPort(rootPortAddress).addBridgeAgent(msg.sender, newBridgeAgent);
+
+        emit BridgeAgentAdded(newBridgeAgent, msg.sender);
     }
 }

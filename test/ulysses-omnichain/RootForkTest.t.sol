@@ -6,10 +6,12 @@ import "./helpers/RootForkHelper.t.sol";
 pragma solidity ^0.8.0;
 
 contract RootForkTest is LzForkTest {
-    using MulticallRootRouterHelper for MulticallRootRouter;
-    using RootBridgeAgentFactoryHelper for RootBridgeAgentFactory;
+    using BaseBranchRouterHelper for BaseBranchRouter;
     using CoreRootRouterHelper for CoreRootRouter;
+    using MulticallRootRouterHelper for MulticallRootRouter;
+    using RootBridgeAgentHelper for RootBridgeAgent;
     using RootBridgeAgentFactoryHelper for RootBridgeAgentFactory;
+    using RootPortHelper for RootPort;
 
     // Consts
 
@@ -19,7 +21,7 @@ contract RootForkTest is LzForkTest {
     //Avax
     uint16 constant avaxChainId = uint16(106);
 
-    //     //Ftm
+    //Ftm
     uint16 constant ftmChainId = uint16(112);
 
     //// System contracts
@@ -96,7 +98,7 @@ contract RootForkTest is LzForkTest {
 
     MockERC20 ftmMockAssetToken;
 
-    ERC20hTokenRoot arbitrumMockAssethToken;
+    ERC20hToken arbitrumMockAssethToken;
 
     MockERC20 arbitrumMockToken;
 
@@ -124,20 +126,29 @@ contract RootForkTest is LzForkTest {
 
     address dao = address(this);
 
+    // For specific tests
+
+    address public newAvaxAssetGlobalAddress;
+
+    address public newFtmAssetGlobalAddress;
+
+    address public newAvaxAssetFtmLocalToken;
+
+    address public mockApp = address(0xDAFA);
+
+    address public newArbitrumAssetGlobalAddress;
+
     function setUp() public override {
         /////////////////////////////////
         //         Fork Setup          //
         /////////////////////////////////
 
         // Set up default fork chains
-        console2.log("Adding Default Chains...");
         setUpDefaultLzChains();
-        console2.log("Added Default Chains.");
 
         /////////////////////////////////
         //      Deploy Root Utils      //
         /////////////////////////////////
-        console2.log("Deploying Root Contracts...");
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
 
         multicallAddress = address(new Multicall2());
@@ -152,15 +163,11 @@ contract RootForkTest is LzForkTest {
         //  Initialize Root Contracts  //
         /////////////////////////////////
 
-        console2.log("Initializing Root Contracts...");
-
         _initRoot();
 
         /////////////////////////////////
         //Deploy Local Branch Contracts//
         /////////////////////////////////
-
-        console2.log("Deploying Arbitrum Local Branch Contracts...");
 
         _deployLocalBranch();
 
@@ -168,49 +175,43 @@ contract RootForkTest is LzForkTest {
         // Deploy Avax Branch Contracts //
         //////////////////////////////////
 
-        console2.log("Deploying Avalanche Branch Contracts...");
-
-        _test_deployAvaxBranch();
+        _deployAvaxBranch();
 
         //////////////////////////////////
         // Deploy Ftm Branch Contracts //
         //////////////////////////////////
 
-        console2.log("Deploying Fantom Contracts...");
-
-        _test_deployFtmBranch();
+        _deployFtmBranch();
 
         /////////////////////////////
         //  Add new branch chains  //
         /////////////////////////////
 
-        console2.log("Adding new Branch Chains to Root...");
-
-        _test_addNewBranchChainsToRoot();
+        _addNewBranchChainsToRoot();
 
         ///////////////////////////////////
         //  Approve new Branches in Root  //
         ///////////////////////////////////
 
-        _test_approveNewBranchesInRoot();
+        _approveNewBranchesInRoot();
 
         ///////////////////////////////////////
         //  Add new branches to  Root Agents //
         ///////////////////////////////////////
 
-        _test_addNewBranchesToRootAgents();
+        _addNewBranchesToRootAgents();
 
         /////////////////////////////////////
         //  Initialize new Branch Routers  //
         /////////////////////////////////////
 
-        _test_initNewBranchRouters();
+        _initNewBranchRouters();
 
         //////////////////////////////////////
         //Deploy Underlying Tokens and Mocks//
         //////////////////////////////////////
 
-        _test_deployUnderlyingTokensAndMocks();
+        _deployUnderlyingTokensAndMocks();
     }
 
     function _deployRoot() internal {
@@ -234,49 +235,9 @@ contract RootForkTest is LzForkTest {
         ) = RootForkHelper._deployLocalBranch(rootChainId, rootPort, owner, rootBridgeAgentFactory, coreRootBridgeAgent);
     }
 
-    function _test_deployAvaxBranch() internal {
-        _deployAvaxBranch();
-
-        // TODO: Tests
-    }
-
-    function _test_deployFtmBranch() internal {
-        _deployFtmBranch();
-
-        // TODO: Tests
-    }
-
-    function _test_addNewBranchChainsToRoot() internal {
-        _addNewBranchChainsToRoot();
-
-        check_addNewBranchChainsToRoot();
-    }
-
-    function _test_approveNewBranchesInRoot() internal {
-        _approveNewBranchesInRoot();
-
-        // TODO: Tests
-    }
-
-    function _test_addNewBranchesToRootAgents() internal {
-        _addNewBranchesToRootAgents();
-
-        // TODO: Tests
-    }
-
-    function _test_initNewBranchRouters() internal {
-        _initNewBranchRouters();
-
-        // TODO: Tests
-    }
-
-    function _test_deployUnderlyingTokensAndMocks() internal {
-        _deployUnderlyingTokensAndMocks();
-
-        // TODO: Tests
-    }
-
     function _deployAvaxBranch() internal {
+        switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
+
         (
             avaxPort,
             avaxHTokenFactory,
@@ -284,7 +245,7 @@ contract RootForkTest is LzForkTest {
             avaxWrappedNativeToken,
             avaxBranchBridgeAgentFactory,
             avaxMulticallRouter
-        ) = _deployBranch(
+        ) = RootForkHelper._deployBranch(
             "Avalanche Ulysses ",
             "avax-u",
             rootChainId,
@@ -294,7 +255,7 @@ contract RootForkTest is LzForkTest {
             lzEndpointAddressAvax
         );
 
-        (avaxCoreBridgeAgent, avaxLocalWrappedNativeToken) = _initBranch(
+        (avaxCoreBridgeAgent, avaxLocalWrappedNativeToken) = RootForkHelper._initBranch(
             coreRootBridgeAgent,
             avaxWrappedNativeToken,
             avaxPort,
@@ -305,6 +266,8 @@ contract RootForkTest is LzForkTest {
     }
 
     function _deployFtmBranch() internal {
+        switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
+
         (
             ftmPort,
             ftmHTokenFactory,
@@ -312,11 +275,11 @@ contract RootForkTest is LzForkTest {
             ftmWrappedNativeToken,
             ftmBranchBridgeAgentFactory,
             ftmMulticallRouter
-        ) = _deployBranch(
+        ) = RootForkHelper._deployBranch(
             "Fantom Ulysses ", "ftm-u", rootChainId, ftmChainId, owner, rootBridgeAgentFactory, lzEndpointAddressFtm
         );
 
-        (ftmCoreBridgeAgent, ftmLocalWrappedNativeToken) = _initBranch(
+        (ftmCoreBridgeAgent, ftmLocalWrappedNativeToken) = RootForkHelper._initBranch(
             coreRootBridgeAgent,
             ftmWrappedNativeToken,
             ftmPort,
@@ -326,74 +289,10 @@ contract RootForkTest is LzForkTest {
         );
     }
 
-    function _deployBranch(
-        string memory _name,
-        string memory _symbol,
-        uint16 _rootChainId,
-        uint16 _branchChainId,
-        address _owner,
-        RootBridgeAgentFactory _rootBridgeAgentFactory,
-        address _lzEndpointAddressBranch
-    )
-        internal
-        returns (
-            BranchPort _branchPort,
-            ERC20hTokenBranchFactory _branchHTokenFactory,
-            CoreBranchRouter _branchCoreRouter,
-            address _branchWrappedNativeToken,
-            BranchBridgeAgentFactory _branchBridgeAgentFactory,
-            BaseBranchRouter _branchMulticallRouter
-        )
-    {
-        switchToLzChainWithoutExecutePendingOrPacketUpdate(_branchChainId);
-
-        _branchPort = new BranchPort(_owner);
-
-        _branchHTokenFactory = new ERC20hTokenBranchFactory(_rootChainId, address(_branchPort), _name, _symbol);
-
-        _branchCoreRouter = new CoreBranchRouter(address(_branchHTokenFactory));
-
-        _branchWrappedNativeToken = address(new WETH());
-
-        _branchBridgeAgentFactory = new BranchBridgeAgentFactory(
-            _branchChainId,
-            _rootChainId,
-            address(_rootBridgeAgentFactory),
-            _lzEndpointAddressBranch,
-            address(_branchCoreRouter),
-            address(_branchPort),
-            _owner
-        );
-
-        _branchMulticallRouter = new BaseBranchRouter();
-    }
-
-    function _initBranch(
-        RootBridgeAgent _coreRootBridgeAgent,
-        address _branchWrappedNativeToken,
-        BranchPort _branchPort,
-        ERC20hTokenBranchFactory _branchHTokenFactory,
-        CoreBranchRouter _branchCoreRouter,
-        BranchBridgeAgentFactory _branchBridgeAgentFactory
-    ) internal returns (BranchBridgeAgent _branchCoreBridgeAgent, address _branchLocalWrappedNativeToken) {
-        _branchHTokenFactory.initialize(_branchWrappedNativeToken, address(_branchCoreRouter));
-        _branchPort.initialize(address(_branchCoreRouter), address(_branchBridgeAgentFactory));
-
-        _branchBridgeAgentFactory.initialize(address(_coreRootBridgeAgent));
-
-        _branchCoreBridgeAgent = BranchBridgeAgent(payable(_branchPort.bridgeAgents(0)));
-        console2.log(address(_branchCoreBridgeAgent));
-
-        _branchCoreRouter.initialize(address(_branchCoreBridgeAgent));
-
-        _branchLocalWrappedNativeToken = address(_branchHTokenFactory.hTokens(0));
-    }
-
     function _addNewBranchChainsToRoot() internal {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
 
-        avaxGlobalToken = _addNewBranchChainToRoot(
-            hTokenRootFactory,
+        avaxGlobalToken = RootForkHelper._addNewBranchChainToRoot(
             rootPort,
             avaxCoreBridgeAgent,
             avaxChainId,
@@ -401,11 +300,11 @@ contract RootForkTest is LzForkTest {
             "AVAX",
             18,
             avaxLocalWrappedNativeToken,
-            avaxWrappedNativeToken
+            avaxWrappedNativeToken,
+            hTokenRootFactory
         );
 
-        ftmGlobalToken = _addNewBranchChainToRoot(
-            hTokenRootFactory,
+        ftmGlobalToken = RootForkHelper._addNewBranchChainToRoot(
             rootPort,
             ftmCoreBridgeAgent,
             ftmChainId,
@@ -413,166 +312,97 @@ contract RootForkTest is LzForkTest {
             "FTM",
             18,
             ftmLocalWrappedNativeToken,
-            ftmWrappedNativeToken
-        );
-    }
-
-    function _addNewBranchChainToRoot(
-        ERC20hTokenRootFactory _hTokenRootFactory,
-        RootPort _rootPort,
-        BranchBridgeAgent _coreCranchBridgeAgent,
-        uint16 _branchChainId,
-        string memory _name,
-        string memory _symbol,
-        uint8 _decimals,
-        address _branchLocalWrappedNativeToken,
-        address _branchWrappedNativeToken
-    ) internal returns (address branchGlobalToken) {
-        uint256 hTokenIndex = _hTokenRootFactory.getHTokens().length;
-
-        _rootPort.addNewChain(
-            address(_coreCranchBridgeAgent),
-            _branchChainId,
-            _name,
-            _symbol,
-            _decimals,
-            _branchLocalWrappedNativeToken,
-            _branchWrappedNativeToken
-        );
-
-        branchGlobalToken = address(_hTokenRootFactory.hTokens(hTokenIndex));
-    }
-
-    function check_addNewBranchChainsToRoot() internal view {
-        check_addNewLocalToken(
-            rootPort, avaxChainId, avaxGlobalToken, avaxLocalWrappedNativeToken, avaxWrappedNativeToken
-        );
-
-        check_addNewLocalToken(rootPort, ftmChainId, ftmGlobalToken, ftmLocalWrappedNativeToken, ftmWrappedNativeToken);
-    }
-
-    function check_addNewLocalToken(
-        RootPort _rootPort,
-        uint16 _branchChainId,
-        address _rootGlobalToken,
-        address _branchLocalToken,
-        address _branchUnderlyingToken
-    ) internal view {
-        require(_rootPort.isGlobalAddress(_rootGlobalToken), "Should be Global Token");
-
-        require(
-            _rootPort.getGlobalTokenFromLocal(_branchLocalToken, _branchChainId) == _rootGlobalToken,
-            "Global Token should be connected to Local"
-        );
-
-        require(
-            _rootPort.getLocalTokenFromGlobal(_rootGlobalToken, _branchChainId) == _branchLocalToken,
-            "Local Token should be connected to Global"
-        );
-        require(
-            _rootPort.getUnderlyingTokenFromLocal(_branchLocalToken, _branchChainId) == _branchUnderlyingToken,
-            "Underlying Token should be connected to Local"
+            ftmWrappedNativeToken,
+            hTokenRootFactory
         );
     }
 
     function _approveNewBranchesInRoot() internal {
-        rootPort.initializeCore(
-            address(coreRootBridgeAgent), address(arbitrumCoreBranchBridgeAgent), address(arbitrumPort)
-        );
+        rootPort._initCore(coreRootBridgeAgent, arbitrumCoreBranchBridgeAgent, arbitrumPort);
 
-        multicallRootBridgeAgent.approveBranchBridgeAgent(rootChainId);
+        multicallRootBridgeAgent._approveBranchBridgeAgent(rootChainId);
 
-        multicallRootBridgeAgent.approveBranchBridgeAgent(avaxChainId);
+        multicallRootBridgeAgent._approveBranchBridgeAgent(avaxChainId);
 
-        multicallRootBridgeAgent.approveBranchBridgeAgent(ftmChainId);
+        multicallRootBridgeAgent._approveBranchBridgeAgent(ftmChainId);
     }
 
     function _addNewBranchesToRootAgents() internal {
         // Start the recorder necessary for packet tracking
-        console2.log("Initializing Fork Test Environment...");
         vm.recordLogs();
 
-        console2.log("Adding new Branch Bridge Agents to Root Bridge Agents...");
-
         vm.deal(address(this), 100 ether);
 
-        console2.log("Avax...");
-
-        coreRootRouter.addBranchToBridgeAgent{value: 10 ether}(
-            address(multicallRootBridgeAgent),
-            address(avaxBranchBridgeAgentFactory),
-            address(avaxMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            multicallRootBridgeAgent,
+            avaxBranchBridgeAgentFactory,
+            avaxMulticallRouter,
             address(this),
             avaxChainId,
-            [GasParams(6_000_000, 10 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 10 ether), GasParams(1_000_000, 0)],
+            10 ether
         );
-        console2.log("Switching to AVAX...");
-        //Switch Chain and Execute Incoming Packets
+
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(avaxChainId);
-        console2.log("DONE AVAX!");
-        console2.log("Switching back to ROOT...");
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
-        console2.log("DONE ROOT!");
 
         vm.deal(address(this), 100 ether);
 
-        coreRootRouter.addBranchToBridgeAgent{value: 10 ether}(
-            address(multicallRootBridgeAgent),
-            address(ftmBranchBridgeAgentFactory),
-            address(ftmMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            multicallRootBridgeAgent,
+            ftmBranchBridgeAgentFactory,
+            ftmMulticallRouter,
             address(this),
             ftmChainId,
-            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)],
+            10 ether
         );
 
-        console2.log("GOING FTM");
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
-        console2.log("DONE FTM");
-        console2.log("GOING ROOT");
-        this.switchToLzChain{gas: 1 ether}(rootChainId);
-        console2.log("DONE ROOT");
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(rootChainId);
 
-        coreRootRouter.addBranchToBridgeAgent(
-            address(multicallRootBridgeAgent),
-            address(arbitrumBranchBridgeAgentFactory),
-            address(arbitrumMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            multicallRootBridgeAgent,
+            arbitrumBranchBridgeAgentFactory,
+            arbitrumMulticallRouter,
             address(this),
             rootChainId,
-            [GasParams(0, 0), GasParams(0, 0)]
+            [GasParams(0, 0), GasParams(0, 0)],
+            0
         );
     }
 
     function _initNewBranchRouters() internal {
-        console2.log("Initializing new Branch Routers...");
-
         arbitrumMulticallBranchBridgeAgent = ArbitrumBranchBridgeAgent(payable(arbitrumPort.bridgeAgents(1)));
-        arbitrumMulticallRouter.initialize(address(arbitrumMulticallBranchBridgeAgent));
+        arbitrumMulticallRouter._init(arbitrumMulticallBranchBridgeAgent, arbitrumPort);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(avaxChainId);
         avaxMulticallBridgeAgent = BranchBridgeAgent(payable(avaxPort.bridgeAgents(1)));
-        avaxMulticallRouter.initialize(address(avaxMulticallBridgeAgent));
+        avaxMulticallRouter._init(avaxMulticallBridgeAgent, avaxPort);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
         ftmMulticallBridgeAgent = BranchBridgeAgent(payable(ftmPort.bridgeAgents(1)));
-        ftmMulticallRouter.initialize(address(ftmMulticallBridgeAgent));
+        ftmMulticallRouter._init(ftmMulticallBridgeAgent, ftmPort);
     }
 
     function _deployUnderlyingTokensAndMocks() internal {
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(avaxChainId);
         // avaxMockAssethToken = new MockERC20("hTOKEN-AVAX", "LOCAL hTOKEN FOR TOKEN IN AVAX", 18);
         avaxMockAssetToken = new MockERC20("underlying token", "UNDER", 18);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
         // ftmMockAssethToken = new MockERC20("hTOKEN-FTM", "LOCAL hTOKEN FOR TOKEN IN FMT", 18);
         ftmMockAssetToken = new MockERC20("underlying token", "UNDER", 18);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
         //arbitrumMockAssethToken is global
         arbitrumMockToken = new MockERC20("underlying token", "UNDER", 18);
@@ -581,20 +411,6 @@ contract RootForkTest is LzForkTest {
     fallback() external payable {}
 
     receive() external payable {}
-
-    struct OutputParams {
-        address recipient;
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-    }
-
-    struct OutputMultipleParams {
-        address recipient;
-        address[] outputTokens;
-        uint256[] amountsOut;
-        uint256[] depositsOut;
-    }
 
     //////////////////////////////////////
     //           Bridge Agents          //
@@ -617,32 +433,32 @@ contract RootForkTest is LzForkTest {
 
         //Create Branch Router in FTM
         switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
-        BaseBranchRouter ftmTestRouter = new BaseBranchRouter();
+        BaseBranchRouter ftmTestRouter;
+        ftmTestRouter = ftmTestRouter._deploy();
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
 
         //Allow new branch from root
-        testRootBridgeAgent.approveBranchBridgeAgent(ftmChainId);
+        testRootBridgeAgent._approveBranchBridgeAgent(ftmChainId);
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 2 ether}(
-            address(testRootBridgeAgent),
-            address(ftmBranchBridgeAgentFactory),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            ftmBranchBridgeAgentFactory,
+            BaseBranchRouter(address(testMulticallRouter)),
             address(this),
             ftmChainId,
-            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)],
+            2 ether
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
-
-        console2.log("new branch bridge agent", ftmPort.bridgeAgents(2));
 
         BranchBridgeAgent ftmTestBranchBridgeAgent = BranchBridgeAgent(payable(ftmPort.bridgeAgents(2)));
 
         ftmTestRouter.initialize(address(ftmTestBranchBridgeAgent));
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         require(testRootBridgeAgent.getBranchBridgeAgent(ftmChainId) == address(ftmTestBranchBridgeAgent));
@@ -664,28 +480,27 @@ contract RootForkTest is LzForkTest {
         testMulticallRouter._init(testRootBridgeAgent);
 
         //Create Branch Router in FTM
-        BaseBranchRouter arbTestRouter = new BaseBranchRouter();
+        BaseBranchRouter arbTestRouter = new ArbitrumBaseBranchRouter();
 
         //Allow new branch from root
-        testRootBridgeAgent.approveBranchBridgeAgent(rootChainId);
+        testRootBridgeAgent._approveBranchBridgeAgent(rootChainId);
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 2 ether}(
-            address(testRootBridgeAgent),
-            address(arbitrumBranchBridgeAgentFactory),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            arbitrumBranchBridgeAgentFactory,
+            BaseBranchRouter(address(testMulticallRouter)),
             address(this),
             rootChainId,
-            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)],
+            2 ether
         );
-
-        console2.log("new branch bridge agent", arbitrumPort.bridgeAgents(2));
 
         BranchBridgeAgent arbTestBranchBridgeAgent = BranchBridgeAgent(payable(arbitrumPort.bridgeAgents(2)));
 
-        arbTestRouter.initialize(address(arbTestBranchBridgeAgent));
+        arbTestRouter._init(arbTestBranchBridgeAgent, arbitrumPort);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         require(testRootBridgeAgent.getBranchBridgeAgent(rootChainId) == address(arbTestBranchBridgeAgent));
@@ -702,7 +517,7 @@ contract RootForkTest is LzForkTest {
         vm.expectRevert(abi.encodeWithSignature("AlreadyAddedBridgeAgent()"));
 
         //Allow new branch
-        testRootBridgeAgent.approveBranchBridgeAgent(ftmChainId);
+        testRootBridgeAgent._approveBranchBridgeAgent(ftmChainId);
     }
 
     function testAddBridgeAgentTwoTimes() public {
@@ -712,24 +527,22 @@ contract RootForkTest is LzForkTest {
         vm.deal(address(this), 1 ether);
 
         //Create Root Bridge Agent
-        MulticallRootRouter testMulticallRouter = new MulticallRootRouter(
-            rootChainId,
-            address(rootPort),
-            multicallAddress
-        );
+        MulticallRootRouter testMulticallRouter;
+        testMulticallRouter = testMulticallRouter._deploy(rootChainId, rootPort, multicallAddress);
 
         RootBridgeAgent testRootBridgeAgent = RootBridgeAgent(payable(rootPort.bridgeAgents(2)));
 
         vm.expectRevert(abi.encodeWithSignature("InvalidChainId()"));
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 0.05 ether}(
-            address(testRootBridgeAgent),
-            address(ftmBranchBridgeAgentFactory),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            ftmBranchBridgeAgentFactory,
+            BaseBranchRouter(address(testMulticallRouter)),
             address(this),
             ftmChainId,
-            [GasParams(0.05 ether, 0.05 ether), GasParams(0.02 ether, 0)]
+            [GasParams(0.05 ether, 0.05 ether), GasParams(0.02 ether, 0)],
+            0.05 ether
         );
     }
 
@@ -751,13 +564,14 @@ contract RootForkTest is LzForkTest {
         vm.expectRevert(abi.encodeWithSignature("UnauthorizedChainId()"));
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 0.05 ether}(
-            address(testRootBridgeAgent),
-            address(ftmBranchBridgeAgentFactory),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            ftmBranchBridgeAgentFactory,
+            BaseBranchRouter(address(testMulticallRouter)),
             address(ftmCoreRouter),
             ftmChainId,
-            [GasParams(0.05 ether, 0.05 ether), GasParams(0.02 ether, 0)]
+            [GasParams(0.05 ether, 0.05 ether), GasParams(0.02 ether, 0)],
+            0.05 ether
         );
     }
 
@@ -780,13 +594,14 @@ contract RootForkTest is LzForkTest {
 
         vm.expectRevert(abi.encodeWithSignature("UnauthorizedCallerNotManager()"));
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 0.05 ether}(
-            address(testRootBridgeAgent),
-            address(ftmBranchBridgeAgentFactory),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            ftmBranchBridgeAgentFactory,
+            BaseBranchRouter(address(testMulticallRouter)),
             address(ftmCoreRouter),
             ftmChainId,
-            [GasParams(0.05 ether, 0.05 ether), GasParams(0.02 ether, 0)]
+            [GasParams(0.05 ether, 0.05 ether), GasParams(0.02 ether, 0)],
+            0.05 ether
         );
     }
 
@@ -810,24 +625,25 @@ contract RootForkTest is LzForkTest {
         testMulticallRouter._init(testRootBridgeAgent);
 
         //Allow new branch
-        testRootBridgeAgent.approveBranchBridgeAgent(ftmChainId);
+        testRootBridgeAgent._approveBranchBridgeAgent(ftmChainId);
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 1 ether}(
-            address(testRootBridgeAgent),
-            address(newFtmBranchBridgeAgentFactory),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            newFtmBranchBridgeAgentFactory,
+            BaseBranchRouter(address(testMulticallRouter)),
             address(this),
             ftmChainId,
-            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)],
+            1 ether
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         newFtmBranchBridgeAgent = ftmPort.bridgeAgents(2);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         require(
@@ -852,21 +668,22 @@ contract RootForkTest is LzForkTest {
         testMulticallRouter._init(testRootBridgeAgent);
 
         //Allow new branch
-        testRootBridgeAgent.approveBranchBridgeAgent(ftmChainId);
+        testRootBridgeAgent._approveBranchBridgeAgent(ftmChainId);
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 0.05 ether}(
-            address(testRootBridgeAgent),
-            address(32),
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            BranchBridgeAgentFactory(address(32)),
+            BaseBranchRouter(address(testMulticallRouter)),
             address(ftmCoreRouter),
             ftmChainId,
-            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)],
+            0.05 ether
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         require(
@@ -893,47 +710,35 @@ contract RootForkTest is LzForkTest {
         testMulticallRouter._init(testRootBridgeAgent);
 
         //Allow new branch
-        testRootBridgeAgent.approveBranchBridgeAgent(ftmChainId);
+        testRootBridgeAgent._approveBranchBridgeAgent(ftmChainId);
 
         // Get wrong factory
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
-        address branchBridgeAgentFactory = address(ftmPort.bridgeAgentFactories(1));
-        //Switch Chain and Execute Incoming Packets
+        address branchBridgeAgentFactory = address(newFtmBranchBridgeAgentFactory);
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         //Create Branch Bridge Agent
-        coreRootRouter.addBranchToBridgeAgent{value: 1 ether}(
-            address(testRootBridgeAgent),
-            branchBridgeAgentFactory,
-            address(testMulticallRouter),
+        coreRootRouter._addBranchToBridgeAgent(
+            testRootBridgeAgent,
+            BranchBridgeAgentFactory(branchBridgeAgentFactory),
+            BaseBranchRouter(address(testMulticallRouter)),
             address(ftmCoreRouter),
             ftmChainId,
-            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)]
+            [GasParams(6_000_000, 15 ether), GasParams(1_000_000, 0)],
+            1 ether
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         require(
             RootBridgeAgent(testRootBridgeAgent).getBranchBridgeAgent(ftmChainId) == address(0),
             "Branch Bridge Agent should not be created"
         );
-    }
-
-    function testRemoveBridgeAgent() public {
-        vm.deal(address(this), 1 ether);
-
-        coreRootRouter.removeBranchBridgeAgent{value: 1 ether}(
-            address(ftmMulticallBridgeAgent), address(this), ftmChainId, GasParams(300_000, 0)
-        );
-
-        //Switch Chain and Execute Incoming Packets
-        switchToLzChain(ftmChainId);
-
-        require(!ftmPort.isBridgeAgent(address(ftmMulticallBridgeAgent)), "Should be disabled");
     }
 
     CoreRootRouter newCoreRootRouter;
@@ -945,15 +750,13 @@ contract RootForkTest is LzForkTest {
     ERC20hTokenBranchFactory newFtmHTokenFactory;
 
     function testSetBranchRouter() public {
-        testRemoveBridgeAgent();
-
         switchToLzChain(rootChainId);
 
         vm.deal(address(this), 1000 ether);
 
         // Deploy new root core
 
-        newHTokenRootFactory = new ERC20hTokenRootFactory(rootChainId, address(rootPort));
+        newHTokenRootFactory = new ERC20hTokenRootFactory(address(rootPort));
 
         newCoreRootRouter = new CoreRootRouter(rootChainId, address(rootPort));
 
@@ -970,7 +773,7 @@ contract RootForkTest is LzForkTest {
 
         // Deploy new Branch Core
 
-        newFtmHTokenFactory = new ERC20hTokenBranchFactory(rootChainId, address(ftmPort), "Fantom", "FTM");
+        newFtmHTokenFactory = new ERC20hTokenBranchFactory(address(ftmPort), "Fantom", "FTM");
 
         newFtmCoreBranchRouter = new CoreBranchRouter(address(newFtmHTokenFactory));
 
@@ -1046,7 +849,7 @@ contract RootForkTest is LzForkTest {
     function testAddLocalTokenNewCore() public {
         testSyncNewCoreBranchRouter();
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         vm.deal(address(this), 10 ether);
@@ -1055,15 +858,12 @@ contract RootForkTest is LzForkTest {
 
         ftmCoreRouter.addLocalToken{value: 10 ether}(address(newFtmMockUnderlyingToken), GasParams(2_000_000, 0));
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         newFtmMockAssetLocalToken = rootPort.getLocalTokenFromUnderlying(address(newFtmMockUnderlyingToken), ftmChainId);
 
         newFtmMockGlobalToken = rootPort.getGlobalTokenFromLocal(newFtmMockAssetLocalToken, ftmChainId);
-
-        console2.log("New Global: ", newFtmMockGlobalToken);
-        console2.log("New Local: ", newFtmMockAssetLocalToken);
 
         require(
             rootPort.getGlobalTokenFromLocal(newFtmMockAssetLocalToken, ftmChainId) == newFtmMockGlobalToken,
@@ -1096,9 +896,9 @@ contract RootForkTest is LzForkTest {
         newRootBridgeAgentFactory = newRootBridgeAgentFactory._deploy(rootChainId, lzEndpointAddress, rootPort);
 
         // Enable new Factory in Root
-        rootPort.addBridgeAgentFactory(address(newRootBridgeAgentFactory));
+        rootPort.toggleBridgeAgentFactory(address(newRootBridgeAgentFactory));
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         // Add new Branch Bridge Agent Factory
@@ -1124,12 +924,12 @@ contract RootForkTest is LzForkTest {
             GasParams(200_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         require(ftmPort.isBridgeAgentFactory(address(newFtmBranchBridgeAgentFactory)), "Factory not enabled");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1140,7 +940,7 @@ contract RootForkTest is LzForkTest {
         // Add new Root Bridge Agent Factory
         newRootBridgeAgentFactory = newRootBridgeAgentFactory._deploy(rootChainId, lzEndpointAddress, rootPort);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         // Add new Branch Bridge Agent Factory
@@ -1184,9 +984,9 @@ contract RootForkTest is LzForkTest {
         newRootBridgeAgentFactory_2 = newRootBridgeAgentFactory_2._deploy(rootChainId, lzEndpointAddress, rootPort);
 
         // Enable new Factory in Root
-        rootPort.addBridgeAgentFactory(address(newRootBridgeAgentFactory_2));
+        rootPort.toggleBridgeAgentFactory(address(newRootBridgeAgentFactory_2));
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         // Add new Branch Bridge Agent Factory
@@ -1200,7 +1000,7 @@ contract RootForkTest is LzForkTest {
             owner
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         coreRootRouter.toggleBranchBridgeAgentFactory{value: 1 ether}(
@@ -1211,13 +1011,13 @@ contract RootForkTest is LzForkTest {
             GasParams(200_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         require(ftmPort.isBridgeAgentFactory(address(newFtmBranchBridgeAgentFactory)), "Factory not enabled");
         require(ftmPort.isBridgeAgentFactory(address(newFtmBranchBridgeAgentFactory_2)), "Factory not enabled");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1229,19 +1029,19 @@ contract RootForkTest is LzForkTest {
         vm.deal(address(this), 1 ether);
 
         switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
-        address factoryToRemove = address(ftmPort.bridgeAgentFactories(1));
+        address factoryToRemove = address(newFtmBranchBridgeAgentFactory);
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
 
         coreRootRouter.toggleBranchBridgeAgentFactory{value: 1 ether}(
             address(rootBridgeAgentFactory), factoryToRemove, address(this), ftmChainId, GasParams(300_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
-        require(!ftmPort.isBridgeAgentFactory(ftmPort.bridgeAgentFactories(1)), "Should be disabled");
+        require(!ftmPort.isBridgeAgentFactory(address(newFtmBranchBridgeAgentFactory)), "Should be disabled");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1258,16 +1058,16 @@ contract RootForkTest is LzForkTest {
         //Get some gas
         vm.deal(address(this), 1 ether);
 
-        coreRootRouter.manageStrategyToken{value: 1 ether}(
+        coreRootRouter.toggleStrategyToken{value: 1 ether}(
             address(mockFtmPortToken), 7000, address(this), ftmChainId, GasParams(300_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         require(ftmPort.isStrategyToken(address(mockFtmPortToken)), "Should be added");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1276,16 +1076,16 @@ contract RootForkTest is LzForkTest {
         vm.deal(address(this), 1 ether);
 
         // vm.expectRevert(abi.encodeWithSignature("InvalidMinimumReservesRatio()"));
-        coreRootRouter.manageStrategyToken{value: 1 ether}(
+        coreRootRouter.toggleStrategyToken{value: 1 ether}(
             address(mockFtmPortToken), 300, address(this), ftmChainId, GasParams(300_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         require(!ftmPort.isStrategyToken(address(mockFtmPortToken)), "Should note be added");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1296,16 +1096,16 @@ contract RootForkTest is LzForkTest {
         //Get some gas
         vm.deal(address(this), 1 ether);
 
-        coreRootRouter.manageStrategyToken{value: 1 ether}(
+        coreRootRouter.toggleStrategyToken{value: 1 ether}(
             address(mockFtmPortToken), 0, address(this), ftmChainId, GasParams(300_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         require(!ftmPort.isStrategyToken(address(mockFtmPortToken)), "Should be removed");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1323,11 +1123,42 @@ contract RootForkTest is LzForkTest {
         // Get some gas
         vm.deal(address(this), 1 ether);
 
-        coreRootRouter.managePortStrategy{value: 1 ether}(
+        coreRootRouter.togglePortStrategy{value: 1 ether}(
             mockFtmPortStrategyAddress,
             address(mockFtmPortToken),
             250 ether,
-            false,
+            7000,
+            address(this),
+            ftmChainId,
+            GasParams(300_000, 0)
+        );
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(ftmChainId);
+
+        require(ftmPort.isPortStrategy(mockFtmPortStrategyAddress, address(mockFtmPortToken)), "Should be added");
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
+    }
+
+    function testAddPortStrategyLowerRatio() public {
+        // Add strategy token
+        testAddStrategyToken();
+
+        // Deploy Mock Strategy
+        switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
+        mockFtmPortStrategyAddress = address(new MockPortStartegy());
+        switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
+
+        // Get some gas
+        vm.deal(address(this), 1 ether);
+
+        coreRootRouter.togglePortStrategy{value: 1 ether}(
+            mockFtmPortStrategyAddress,
+            address(mockFtmPortToken),
+            250 ether,
+            8000,
             address(this),
             ftmChainId,
             GasParams(300_000, 0)
@@ -1347,22 +1178,22 @@ contract RootForkTest is LzForkTest {
         vm.deal(address(this), 1 ether);
 
         //UnrecognizedStrategyToken();
-        coreRootRouter.managePortStrategy{value: 1 ether}(
+        coreRootRouter.togglePortStrategy{value: 1 ether}(
             mockFtmPortStrategyAddress,
             address(mockFtmPortToken),
             300,
-            false,
+            7000,
             address(this),
             ftmChainId,
             GasParams(300_000, 0)
         );
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
 
         require(!ftmPort.isPortStrategy(mockFtmPortStrategyAddress, address(mockFtmPortToken)), "Should not be added");
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
     }
 
@@ -1370,7 +1201,7 @@ contract RootForkTest is LzForkTest {
         // Add Strategy token and Port strategy
         testAddPortStrategy();
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
 
         // Add token balance to port
@@ -1416,7 +1247,7 @@ contract RootForkTest is LzForkTest {
         // Add Strategy token and Port strategy
         testManage();
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
 
         // Warp 1 day
@@ -1465,7 +1296,7 @@ contract RootForkTest is LzForkTest {
         // Add Strategy token and Port strategy
         testAddPortStrategy();
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
 
         // Add token balance to port
@@ -1485,7 +1316,7 @@ contract RootForkTest is LzForkTest {
         // Add Strategy token and Port strategy
         testAddPortStrategy();
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
 
         // Add token balance to port
@@ -1499,6 +1330,26 @@ contract RootForkTest is LzForkTest {
 
         // Request management of assets
         ftmPort.manage(address(mockFtmPortToken), 300 ether);
+    }
+
+    function testManageExceedsStrategyDebtLimit() public {
+        // Add Strategy token and Port strategy
+        testAddPortStrategyLowerRatio();
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChainWithoutExecutePendingOrPacketUpdate(ftmChainId);
+
+        // Add token balance to port
+        mockFtmPortToken.mint(address(ftmPort), 750 ether);
+
+        // Prank into strategy
+        vm.startPrank(mockFtmPortStrategyAddress);
+
+        // Expect revert
+        vm.expectRevert();
+
+        // Request management of assets
+        ftmPort.manage(address(mockFtmPortToken), 225 ether);
     }
 
     function testReplenishAsStrategy() public {
@@ -1604,25 +1455,20 @@ contract RootForkTest is LzForkTest {
     //          TOKEN MANAGEMENT        //
     //////////////////////////////////////
 
-    address public newAvaxAssetGlobalAddress;
-
     function testAddLocalToken() public {
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(avaxChainId);
 
         vm.deal(address(this), 10 ether);
 
         avaxCoreRouter.addLocalToken{value: 10 ether}(address(avaxMockAssetToken), GasParams(2_000_000, 0));
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         avaxMockAssethToken = rootPort.getLocalTokenFromUnderlying(address(avaxMockAssetToken), avaxChainId);
 
         newAvaxAssetGlobalAddress = rootPort.getGlobalTokenFromLocal(avaxMockAssethToken, avaxChainId);
-
-        console2.log("New Global: ", newAvaxAssetGlobalAddress);
-        console2.log("New Local: ", avaxMockAssethToken);
 
         require(
             rootPort.getGlobalTokenFromLocal(avaxMockAssethToken, avaxChainId) == newAvaxAssetGlobalAddress,
@@ -1638,15 +1484,11 @@ contract RootForkTest is LzForkTest {
         );
     }
 
-    address public newFtmAssetGlobalAddress;
-
-    address public newAvaxAssetFtmLocalToken;
-
     function testAddGlobalTokenFork() public {
         //Add Local Token from Avax
         testAddLocalToken();
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(avaxChainId);
 
         vm.deal(address(this), 1000 ether);
@@ -1656,18 +1498,16 @@ contract RootForkTest is LzForkTest {
 
         avaxCoreRouter.addGlobalToken{value: 1000 ether}(newAvaxAssetGlobalAddress, ftmChainId, gasParams);
 
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(ftmChainId);
-        //Switch Chain and Execute Incoming Packets
+        // Switch Chain and Execute Incoming Packets
         switchToLzChain(rootChainId);
 
         newAvaxAssetFtmLocalToken = rootPort.getLocalTokenFromGlobal(newAvaxAssetGlobalAddress, ftmChainId);
 
         require(newAvaxAssetFtmLocalToken != address(0), "Failed is zero");
-
-        console2.log("New Local: ", newAvaxAssetFtmLocalToken);
 
         require(
             rootPort.getLocalTokenFromGlobal(newAvaxAssetGlobalAddress, ftmChainId) == newAvaxAssetFtmLocalToken,
@@ -1679,10 +1519,6 @@ contract RootForkTest is LzForkTest {
             "Underlying should not be added"
         );
     }
-
-    address public mockApp = address(0xDAFA);
-
-    address public newArbitrumAssetGlobalAddress;
 
     function testAddLocalTokenArbitrum() public {
         //Set up
@@ -1697,8 +1533,6 @@ contract RootForkTest is LzForkTest {
         );
 
         newArbitrumAssetGlobalAddress = rootPort.getLocalTokenFromUnderlying(address(arbitrumMockToken), rootChainId);
-
-        console2.log("New: ", newArbitrumAssetGlobalAddress);
 
         require(
             rootPort.getGlobalTokenFromLocal(address(newArbitrumAssetGlobalAddress), rootChainId)
@@ -1721,88 +1555,56 @@ contract RootForkTest is LzForkTest {
     //          TOKEN TRANSFERS         //
     //////////////////////////////////////
 
-    function testCallOutWithDepositArbtirum() public {
-        //Set up
-        testAddLocalTokenArbitrum();
+    function encodeMulticallNoOutput(Multicall2.Call[] memory callData) internal pure returns (bytes memory) {
+        return abi.encodePacked(bytes1(0x01), abi.encode(callData));
+    }
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
+    function encodeMulticallSingleOutput(
+        Multicall2.Call[] memory callData,
+        OutputParams memory outputParams,
+        uint16 dstChainId,
+        GasParams memory gasParams
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(bytes1(0x02), abi.encode(callData, outputParams, dstChainId, gasParams));
+    }
 
-        {
-            outputToken = newArbitrumAssetGlobalAddress;
-            amountOut = 100 ether;
-            depositOut = 50 ether;
+    function encodeMulticallMultipleOutput(
+        Multicall2.Call[] memory callData,
+        OutputMultipleParams memory outputMultipleParams,
+        uint16 dstChainId,
+        GasParams memory gasParams
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(bytes1(0x03), abi.encode(callData, outputMultipleParams, dstChainId, gasParams));
+    }
 
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
+    function prepareMulticallSingleOutput_singleTransfer(
+        address multicallTransferToken,
+        address multicallTransferTo,
+        uint256 multicallTransferAmount,
+        address settlementOwner,
+        address recipient,
+        address outputToken,
+        uint256 amountOut,
+        uint256 depositOut,
+        uint16 dstChainId,
+        GasParams memory gasParams
+    ) internal pure returns (bytes memory) {
+        Multicall2.Call[] memory calls = new Multicall2.Call[](1);
 
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newArbitrumAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 0 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = rootChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId);
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
-        //Get some gas.
-        vm.deal(address(this), 1 ether);
-
-        //Mint Underlying Token.
-        arbitrumMockToken.mint(address(this), 100 ether);
-
-        //Approve spend by router
-        arbitrumMockToken.approve(address(arbitrumPort), 100 ether);
-
-        //Prepare deposit info
-        DepositInput memory depositInput = DepositInput({
-            hToken: address(newArbitrumAssetGlobalAddress),
-            token: address(arbitrumMockToken),
-            amount: 100 ether,
-            deposit: 100 ether
+        //Mock action
+        calls[0] = Multicall2.Call({
+            target: outputToken,
+            callData: abi.encodeWithSelector(bytes4(0xa9059cbb), multicallTransferTo, multicallTransferAmount)
         });
 
-        //Call Deposit function
-        arbitrumMulticallBranchBridgeAgent.callOutSignedAndBridge{value: 1 ether}(
-            payable(address(this)), packedData, depositInput, GasParams(0.5 ether, 0.5 ether), true
-        );
+        //Output Params
+        OutputParams memory outputParams = OutputParams(settlementOwner, recipient, outputToken, amountOut, depositOut);
 
-        // Test If Deposit was successful
-        testCreateDepositSingle(
-            address(arbitrumMulticallBranchBridgeAgent),
-            uint32(1),
-            address(this),
-            address(newArbitrumAssetGlobalAddress),
-            address(arbitrumMockToken),
-            100 ether,
-            100 ether
-        );
+        return encodeMulticallSingleOutput(calls, outputParams, dstChainId, gasParams);
+    }
 
-        console2.log("LocalPort Balance:", MockERC20(arbitrumMockToken).balanceOf(address(arbitrumPort)));
-        require(
-            MockERC20(arbitrumMockToken).balanceOf(address(arbitrumPort)) == 50 ether, "LocalPort should have 50 tokens"
-        );
-
-        console2.log("User Balance:", MockERC20(arbitrumMockToken).balanceOf(address(this)));
-        require(MockERC20(arbitrumMockToken).balanceOf(address(this)) == 50 ether, "User should have 50 tokens");
-
-        console2.log("User Global Balance:", MockERC20(newArbitrumAssetGlobalAddress).balanceOf(address(this)));
-        require(
-            MockERC20(newArbitrumAssetGlobalAddress).balanceOf(address(this)) == 50 ether,
-            "User should have 50 global tokens"
-        );
+    function testCallOutWithDepositArbtirum() public {
+        _testCallOutWithDepositArbtirum(address(this), 100 ether, 100 ether, 100 ether, 50 ether);
     }
 
     function testFuzzCallOutWithDepositArbtirum(
@@ -1815,37 +1617,43 @@ contract RootForkTest is LzForkTest {
         // Input restrictions
         _amount %= type(uint128).max;
 
+        uint256 size;
+        assembly {
+            size := extcodesize(_user)
+        }
+
+        // Input restrictions
         vm.assume(
-            _user != address(0) && _user != address(arbitrumPort) && _user != address(rootPort)
-                && _amount > _deposit && _amount >= _amountOut && _amount - _amountOut >= _depositOut
-                && _depositOut < _amountOut
+            _user != address(0) && size == 0 && _amount > _deposit && _amount >= _amountOut
+                && _amount - _amountOut >= _depositOut && _depositOut < _amountOut
         );
 
+        _testCallOutWithDepositArbtirum(_user, _amount, _deposit, _amountOut, _depositOut);
+    }
+
+    function _testCallOutWithDepositArbtirum(
+        address _user,
+        uint256 _amount,
+        uint256 _deposit,
+        uint256 _amountOut,
+        uint256 _depositOut
+    ) internal {
         //Set up
         testAddLocalTokenArbitrum();
 
-        //Prepare data
-        bytes memory packedData;
-
-        {
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newArbitrumAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 0 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams =
-                OutputParams(_user, newArbitrumAssetGlobalAddress, _amountOut, _depositOut);
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, rootChainId);
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
+        // Prepare data
+        bytes memory packedData = prepareMulticallSingleOutput_singleTransfer(
+            newArbitrumAssetGlobalAddress,
+            mockApp,
+            0,
+            _user,
+            _user,
+            newArbitrumAssetGlobalAddress,
+            _amountOut,
+            _depositOut,
+            rootChainId,
+            GasParams(0, 0)
+        );
 
         //Get some gas.
         vm.deal(_user, 1 ether);
@@ -1853,7 +1661,7 @@ contract RootForkTest is LzForkTest {
         if (_amount - _deposit > 0) {
             //assure there is enough balance for mock action
             vm.startPrank(address(rootPort));
-            ERC20hTokenRoot(newArbitrumAssetGlobalAddress).mint(_user, _amount - _deposit, rootChainId);
+            ERC20hToken(newArbitrumAssetGlobalAddress).mint(_user, _amount - _deposit);
             vm.stopPrank();
             arbitrumMockToken.mint(address(arbitrumPort), _amount - _deposit);
         }
@@ -1869,18 +1677,12 @@ contract RootForkTest is LzForkTest {
             deposit: _deposit
         });
 
-        console2.log("BALANCE BEFORE:");
-        console2.log("arbitrumMockToken Balance:", MockERC20(arbitrumMockToken).balanceOf(_user));
-        console2.log(
-            "newArbitrumAssetGlobalAddress Balance:", MockERC20(newArbitrumAssetGlobalAddress).balanceOf(_user)
-        );
-
         //Call Deposit function
         vm.startPrank(_user);
         arbitrumMockToken.approve(address(arbitrumPort), _deposit);
-        ERC20hTokenRoot(newArbitrumAssetGlobalAddress).approve(address(rootPort), _amount - _deposit);
+        ERC20hToken(newArbitrumAssetGlobalAddress).approve(address(rootPort), _amount - _deposit);
         arbitrumMulticallBranchBridgeAgent.callOutSignedAndBridge{value: 1 ether}(
-            payable(_user), packedData, depositInput, GasParams(0.5 ether, 0.5 ether), false
+            packedData, depositInput, GasParams(0.5 ether, 0.5 ether), false
         );
         vm.stopPrank();
 
@@ -1895,37 +1697,21 @@ contract RootForkTest is LzForkTest {
             _deposit
         );
 
-        console2.log("DATA");
-        console2.log(_amount);
-        console2.log(_deposit);
-        console2.log(_amountOut);
-        console2.log(_depositOut);
-
         address userAccount = address(rootPort.getUserAccount(_user));
 
-        console2.log("LocalPort Balance:", MockERC20(arbitrumMockToken).balanceOf(address(arbitrumPort)));
-        console2.log("Expected:", _amount - _deposit + _deposit - _depositOut);
         require(
             MockERC20(arbitrumMockToken).balanceOf(address(arbitrumPort)) == _amount - _deposit + _deposit - _depositOut,
             "LocalPort tokens"
         );
 
-        console2.log("RootPort Balance:", MockERC20(newArbitrumAssetGlobalAddress).balanceOf(address(rootPort)));
-        // console2.log("Expected:", 0); SINCE ORIGIN == DESTINATION == ARBITRUM
         require(MockERC20(newArbitrumAssetGlobalAddress).balanceOf(address(rootPort)) == 0, "RootPort tokens");
 
-        console2.log("User Balance:", MockERC20(arbitrumMockToken).balanceOf(_user));
-        console2.log("Expected:", _depositOut);
         require(MockERC20(arbitrumMockToken).balanceOf(_user) == _depositOut, "User tokens");
 
-        console2.log("User Global Balance:", MockERC20(newArbitrumAssetGlobalAddress).balanceOf(_user));
-        console2.log("Expected:", _amountOut - _depositOut);
         require(
             MockERC20(newArbitrumAssetGlobalAddress).balanceOf(_user) == _amountOut - _depositOut, "User Global tokens"
         );
 
-        console2.log("User Account Balance:", MockERC20(newArbitrumAssetGlobalAddress).balanceOf(userAccount));
-        console2.log("Expected:", _amount - _amountOut);
         require(
             MockERC20(newArbitrumAssetGlobalAddress).balanceOf(userAccount) == _amount - _amountOut,
             "User Account tokens"
@@ -1945,43 +1731,28 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
         prevNonceBranch = avaxMulticallBridgeAgent.depositNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
+        // Prepare data
+        bytes memory packedData = prepareMulticallSingleOutput_singleTransfer(
+            newAvaxAssetGlobalAddress,
+            mockApp,
+            1 ether,
+            address(18),
+            address(18),
+            newAvaxAssetGlobalAddress,
+            99 ether,
+            50 ether,
+            avaxChainId,
+            GasParams(500_000, 0)
+        );
 
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 99 ether;
-            depositOut = 50 ether;
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
 
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(500_000, 0));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
-        //Get some gas.
-        vm.deal(address(this), 100 ether);
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
@@ -1996,16 +1767,17 @@ contract RootForkTest is LzForkTest {
 
         //Call Deposit function
         avaxMulticallBridgeAgent.callOutSignedAndBridge{value: 100 ether}(
-            payable(address(this)), packedData, depositInput, GasParams(800_000, 0.01 ether), false
+            packedData, depositInput, GasParams(1_800_000, 0.01 ether), false
         );
+
+        //Stop prank
+        vm.stopPrank();
 
         require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
 
-        console2.log("GOING ROOT AFTER BRIDGE REQUEST FROM AVAX");
-
         switchToLzChain(rootChainId);
 
-        require(prevNonceRoot == multicallRootBridgeAgent.settlementNonce(), "Root should not be updated");
+        require(prevNonceRoot == multicallRootBridgeAgent.settlementNonce() - 1, "Root should be updated");
 
         switchToChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
 
@@ -2013,7 +1785,7 @@ contract RootForkTest is LzForkTest {
         testCreateDepositSingle(
             address(avaxMulticallBridgeAgent),
             uint32(prevNonceBranch),
-            address(this),
+            address(18),
             address(avaxMockAssethToken),
             address(avaxMockAssetToken),
             100 ether,
@@ -2033,43 +1805,28 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
         prevNonceBranch = avaxMulticallBridgeAgent.depositNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
+        // Prepare data
+        bytes memory packedData = prepareMulticallSingleOutput_singleTransfer(
+            newAvaxAssetGlobalAddress,
+            mockApp,
+            1 ether,
+            address(18),
+            address(18),
+            newAvaxAssetGlobalAddress,
+            99 ether,
+            50 ether,
+            avaxChainId,
+            GasParams(500_000, 0)
+        );
 
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 99 ether;
-            depositOut = 50 ether;
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
 
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(500_000, 0));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
-        //Get some gas.
-        vm.deal(address(this), 100 ether);
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
@@ -2084,12 +1841,13 @@ contract RootForkTest is LzForkTest {
 
         //Call Deposit function
         avaxMulticallBridgeAgent.callOutSignedAndBridge{value: 100 ether}(
-            payable(address(this)), packedData, depositInput, GasParams(600_000, 0.01 ether), false
+            packedData, depositInput, GasParams(600_000, 0.01 ether), false
         );
 
-        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
+        //Stop prank
+        vm.stopPrank();
 
-        console2.log("GOING ROOT AFTER BRIDGE REQUEST FROM AVAX");
+        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
 
         switchToLzChain(rootChainId);
 
@@ -2101,7 +1859,7 @@ contract RootForkTest is LzForkTest {
         testCreateDepositSingle(
             address(avaxMulticallBridgeAgent),
             uint32(prevNonceBranch),
-            address(this),
+            address(18),
             address(avaxMockAssethToken),
             address(avaxMockAssetToken),
             100 ether,
@@ -2121,43 +1879,28 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
         prevNonceBranch = avaxMulticallBridgeAgent.depositNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
+        // Prepare data
+        bytes memory packedData = prepareMulticallSingleOutput_singleTransfer(
+            newAvaxAssetGlobalAddress,
+            mockApp,
+            1 ether,
+            address(18),
+            address(18),
+            newAvaxAssetGlobalAddress,
+            99 ether,
+            50 ether,
+            ftmChainId, // root will revert with `UnrecognizedUnderlyingAddress` because ftm local token was not added
+            GasParams(500_000, 0)
+        );
 
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 990 ether;
-            depositOut = 50 ether;
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
 
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(500_000, 0));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
-        //Get some gas.
-        vm.deal(address(this), 100 ether);
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
@@ -2172,12 +1915,13 @@ contract RootForkTest is LzForkTest {
 
         //Call Deposit function
         avaxMulticallBridgeAgent.callOutSignedAndBridge{value: 100 ether}(
-            payable(address(this)), packedData, depositInput, GasParams(1_250_000, 0.01 ether), false
+            packedData, depositInput, GasParams(1_250_000, 0.01 ether), false
         );
 
-        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
+        //Stop prank
+        vm.stopPrank();
 
-        console2.log("GOING ROOT AFTER BRIDGE REQUEST FROM AVAX");
+        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
 
         switchToLzChain(rootChainId);
 
@@ -2189,7 +1933,7 @@ contract RootForkTest is LzForkTest {
         testCreateDepositSingle(
             address(avaxMulticallBridgeAgent),
             uint32(prevNonceBranch),
-            address(this),
+            address(18),
             address(avaxMockAssethToken),
             address(avaxMockAssetToken),
             100 ether,
@@ -2207,43 +1951,28 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
         prevNonceBranch = avaxMulticallBridgeAgent.depositNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
+        // Prepare data
+        bytes memory packedData = prepareMulticallSingleOutput_singleTransfer(
+            newAvaxAssetGlobalAddress,
+            mockApp,
+            1 ether,
+            address(18),
+            address(18),
+            newAvaxAssetGlobalAddress,
+            99 ether,
+            50 ether,
+            avaxChainId,
+            GasParams(500_000, 0)
+        );
 
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 99 ether;
-            depositOut = 50 ether;
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
 
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(500_000, 0));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
-        //Get some gas.
-        vm.deal(address(this), 100 ether);
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
@@ -2258,12 +1987,13 @@ contract RootForkTest is LzForkTest {
 
         //Call Deposit function
         avaxMulticallBridgeAgent.callOutSignedAndBridge{value: 100 ether}(
-            payable(address(this)), packedData, depositInput, GasParams(800_000, 0.01 ether), true
+            packedData, depositInput, GasParams(800_000, 0.01 ether), true
         );
 
-        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
+        //Stop prank
+        vm.stopPrank();
 
-        console2.log("GOING ROOT AFTER BRIDGE REQUEST FROM AVAX");
+        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
 
         switchToLzChain(rootChainId);
 
@@ -2275,7 +2005,7 @@ contract RootForkTest is LzForkTest {
         testCreateDepositSingle(
             address(avaxMulticallBridgeAgent),
             uint32(prevNonceBranch),
-            address(this),
+            address(18),
             address(avaxMockAssethToken),
             address(avaxMockAssetToken),
             100 ether,
@@ -2295,43 +2025,28 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
         prevNonceBranch = avaxMulticallBridgeAgent.depositNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
+        // Prepare data
+        bytes memory packedData = prepareMulticallSingleOutput_singleTransfer(
+            newAvaxAssetGlobalAddress,
+            mockApp,
+            1 ether,
+            address(18),
+            address(18),
+            newAvaxAssetGlobalAddress,
+            99 ether,
+            50 ether,
+            ftmChainId, // root will revert with `UnrecognizedUnderlyingAddress` because ftm local token was not added
+            GasParams(500_000, 0)
+        );
 
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 990 ether;
-            depositOut = 50 ether;
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
 
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(500_000, 0));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
-        //Get some gas.
-        vm.deal(address(this), 100 ether);
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
@@ -2346,12 +2061,13 @@ contract RootForkTest is LzForkTest {
 
         //Call Deposit function
         avaxMulticallBridgeAgent.callOutSignedAndBridge{value: 100 ether}(
-            payable(address(this)), packedData, depositInput, GasParams(1_250_000, 0.01 ether), true
+            packedData, depositInput, GasParams(1_500_000, 0.2 ether), true
         );
 
-        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
+        //Stop prank
+        vm.stopPrank();
 
-        console2.log("GOING ROOT AFTER BRIDGE REQUEST FROM AVAX");
+        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce() - 1, "Branch should be updated");
 
         switchToLzChain(rootChainId);
 
@@ -2363,7 +2079,7 @@ contract RootForkTest is LzForkTest {
         testCreateDepositSingle(
             address(avaxMulticallBridgeAgent),
             uint32(prevNonceBranch),
-            address(this),
+            address(18),
             address(avaxMockAssethToken),
             address(avaxMockAssetToken),
             100 ether,
@@ -2380,6 +2096,27 @@ contract RootForkTest is LzForkTest {
     //    RETRY, RETRIEVE AND REDEEM    //
     //////////////////////////////////////
 
+    // function testFallbackGasAmount() public {
+    //     _testFallbackGasAmount(payable(address(this)), 10);
+    // }
+
+    // function _testFallbackGasAmount(address payable _refundee, uint32 _settlementNonce) private {
+    //     vm.deal(address(this), 10 ether);
+
+    //     uint256 gasStart = gasleft();
+    //     //Sends message to LayerZero messaging layer
+    //     ILayerZeroEndpoint(lzEndpointAddress).send{value: address(this).balance}(
+    //         rootChainId,
+    //         abi.encodePacked(address(this), address(this)),
+    //         abi.encodePacked(bytes1(0x09), _settlementNonce),
+    //         _refundee,
+    //         address(0),
+    //         abi.encodePacked(uint16(1), uint256(50_000))
+    //     );
+
+    //     console2.log("gas used: ", gasStart - gasleft());
+    // }
+
     function testRetrieveDeposit() public {
         //Set up
         testCallOutWithDepositNotEnoughGasForRootFallbackMode();
@@ -2387,23 +2124,24 @@ contract RootForkTest is LzForkTest {
         switchToLzChain(avaxChainId);
 
         //Get some ether.
-        vm.deal(address(this), 10 ether);
+        vm.deal(address(18), 10 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Call Deposit function
-        console2.log("retrieving");
         avaxMulticallBridgeAgent.retrieveDeposit{value: 10 ether}(prevNonceRoot, GasParams(1_000_000, 0.01 ether));
+
+        //Stop prank
+        vm.stopPrank();
 
         require(
             avaxMulticallBridgeAgent.getDepositEntry(prevNonceRoot).status == 0, "Deposit status should be success."
         );
 
-        console2.log("Going ROOT to retrieve Deposit");
         switchToLzChain(rootChainId);
-        console2.log("Triggered Fallback");
 
-        console2.log("Returning to FTM");
         switchToLzChain(avaxChainId);
-        console2.log("Done ROOT");
 
         require(
             avaxMulticallBridgeAgent.getDepositEntry(prevNonceRoot).status == 1,
@@ -2416,45 +2154,51 @@ contract RootForkTest is LzForkTest {
         testRetrieveDeposit();
 
         //Get some ether.
-        vm.deal(address(this), 10 ether);
+        vm.deal(address(18), 10 ether);
 
-        uint256 balanceBefore = avaxMockAssetToken.balanceOf(address(this));
+        //Prank address 18
+        vm.startPrank(address(18));
+
+        uint256 balanceBefore = avaxMockAssetToken.balanceOf(address(18));
 
         //Call Deposit function
-        console2.log("redeeming");
-        avaxMulticallBridgeAgent.redeemDeposit(prevNonceRoot);
+        avaxMulticallBridgeAgent.redeemDeposit(prevNonceRoot, address(18));
+
+        //Stop prank
+        vm.stopPrank();
 
         require(
             avaxMulticallBridgeAgent.getDepositEntry(prevNonceRoot).owner == address(0),
             "Deposit status should have ceased to exist"
         );
 
-        require(
-            avaxMockAssetToken.balanceOf(address(this)) == balanceBefore + 100 ether, "Balance should be increased."
-        );
+        require(avaxMockAssetToken.balanceOf(address(18)) == balanceBefore + 100 ether, "Balance should be increased.");
     }
 
     function testRedeemDepositAfterFallback() public {
         //Set up
         testCallOutWithDepositWrongCalldataForRootFallbackMode();
 
-        //Get some ether.
-        vm.deal(address(this), 10 ether);
+        uint256 balanceBefore = avaxMockAssetToken.balanceOf(address(18));
 
-        uint256 balanceBefore = avaxMockAssetToken.balanceOf(address(this));
+        //Get some ether.
+        vm.deal(address(18), 10 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Call Deposit function
-        console2.log("redeeming");
-        avaxMulticallBridgeAgent.redeemDeposit(prevNonceRoot);
+        avaxMulticallBridgeAgent.redeemDeposit(prevNonceRoot, address(18));
+
+        //Stop prank
+        vm.stopPrank();
 
         require(
             avaxMulticallBridgeAgent.getDepositEntry(prevNonceRoot).owner == address(0),
             "Deposit status should have ceased to exist"
         );
 
-        require(
-            avaxMockAssetToken.balanceOf(address(this)) == balanceBefore + 100 ether, "Balance should be increased."
-        );
+        require(avaxMockAssetToken.balanceOf(address(18)) == balanceBefore + 100 ether, "Balance should be increased.");
     }
 
     function testRetryDeposit() public {
@@ -2467,7 +2211,7 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
         prevNonceRoot = multicallRootBridgeAgent.settlementNonce();
 
-        //Prepare data
+        // Prepare data
         address outputToken;
         uint256 amountOut;
         uint256 depositOut;
@@ -2487,7 +2231,8 @@ contract RootForkTest is LzForkTest {
             });
 
             //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(18), address(18), outputToken, amountOut, depositOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
@@ -2501,19 +2246,25 @@ contract RootForkTest is LzForkTest {
 
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
 
-        //Get some gas 5 AVAX.
-        vm.deal(address(this), 5 ether);
+        //Get some ether.
+        vm.deal(address(18), 10 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
 
         //Call Deposit function
-        avaxMulticallBridgeAgent.retryDeposit{value: 5 ether}(
-            true, prevNonceBranch - 1, packedData, GasParams(2_000_000, 0.02 ether), false
+        avaxMulticallBridgeAgent.retryDepositSigned{value: 5 ether}(
+            prevNonceBranch - 1, packedData, GasParams(2_000_000, 0.02 ether), false
         );
+
+        //Stop prank
+        vm.stopPrank();
 
         require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
 
@@ -2529,7 +2280,7 @@ contract RootForkTest is LzForkTest {
         switchToLzChain(ftmChainId);
 
         // check this address balance
-        require(MockERC20(newAvaxAssetFtmLocalToken).balanceOf(address(this)) == 99 ether, "Tokens should be received");
+        require(MockERC20(newAvaxAssetFtmLocalToken).balanceOf(address(18)) == 99 ether, "Tokens should be received");
     }
 
     function testRetryDepositNotEnoughGasForSettlement() public {
@@ -2538,11 +2289,15 @@ contract RootForkTest is LzForkTest {
 
         prevNonceBranch = avaxMulticallBridgeAgent.depositNonce();
 
+        console2.log("previous nonce branch", prevNonceBranch);
+
         //Switch to avax
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
         prevNonceRoot = multicallRootBridgeAgent.settlementNonce();
 
-        //Prepare data
+        console2.log("previous nonce root", prevNonceRoot);
+
+        // Prepare data
         address outputToken;
         uint256 amountOut;
         uint256 depositOut;
@@ -2562,13 +2317,14 @@ contract RootForkTest is LzForkTest {
             });
 
             //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(18), address(18), outputToken, amountOut, depositOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
 
             //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(20_000, 1 ether));
+            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(0, 1 ether));
 
             //Pack FuncId
             packedData = abi.encodePacked(bytes1(0x02), data);
@@ -2576,25 +2332,29 @@ contract RootForkTest is LzForkTest {
 
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
 
-        //Get some gas 5 AVAX.
-        vm.deal(address(this), 5 ether);
+        //Get some ether.
+        vm.deal(address(18), 10 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Mint Underlying Token.
-        avaxMockAssetToken.mint(address(this), 100 ether);
+        avaxMockAssetToken.mint(address(18), 100 ether);
 
         //Approve spend by router
         avaxMockAssetToken.approve(address(avaxPort), 100 ether);
 
         //Call Deposit function
-        avaxMulticallBridgeAgent.retryDeposit{value: 5 ether}(
-            true, prevNonceBranch - 1, packedData, GasParams(2_000_000, 0.02 ether), false
+        avaxMulticallBridgeAgent.retryDepositSigned{value: 5 ether}(
+            prevNonceBranch - 1, packedData, GasParams(2_000_000, 0.02 ether), false
         );
+
+        // Stop prank
+        vm.stopPrank();
 
         require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
 
         switchToLzChain(rootChainId);
-
-        console2.log("going root - retry deposit");
 
         require(prevNonceRoot == multicallRootBridgeAgent.settlementNonce() - 1, "Root should be updated");
 
@@ -2605,8 +2365,14 @@ contract RootForkTest is LzForkTest {
 
         switchToLzChain(ftmChainId);
 
+        //ExecutionStatus should be 0
+        require(
+            ftmMulticallBridgeAgent.executionState(prevNonceBranch + 1) == 0,
+            "Settlement status should not be executed."
+        );
+
         // check this address balance
-        require(MockERC20(newAvaxAssetFtmLocalToken).balanceOf(address(this)) == 0, "Tokens should be received");
+        require(MockERC20(newAvaxAssetFtmLocalToken).balanceOf(address(18)) == 0, "Tokens should not be received");
     }
 
     function testRetrySettlement() public {
@@ -2621,53 +2387,30 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
         prevNonceRoot = multicallRootBridgeAgent.settlementNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
-
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 99 ether;
-            depositOut = 0;
-
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(800_000, 1 ether));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
 
-        //Get some gas 5 AVAX.
-        vm.deal(address(this), 100 ether);
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
+        vm.etch(address(18), address(avaxMulticallBridgeAgent).code);
+
+        console2.log("testRetrySettlement from avax");
 
         //Call Deposit function
         avaxMulticallBridgeAgent.retrySettlement{value: 100 ether}(
-            prevNonceBranch - 1, "", [GasParams(1_000_000, 0.1 ether), GasParams(200_000, 0)], false
+            prevNonceBranch - 1, "", [GasParams(1_000_000, 0.1 ether), GasParams(150_000, 0)], false
         );
+
+        //Stop prank
+        vm.stopPrank();
 
         require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
 
         switchToLzChain(rootChainId);
 
-        console2.log("going root - retry settlement");
+        console2.log("executed root going testRetrySettlement from root");
 
         require(prevNonceRoot == multicallRootBridgeAgent.settlementNonce(), "Root should not be updated");
 
@@ -2679,11 +2422,7 @@ contract RootForkTest is LzForkTest {
         switchToLzChain(ftmChainId);
 
         // check this address balance
-        require(MockERC20(newAvaxAssetFtmLocalToken).balanceOf(address(this)) == 99 ether, "Tokens should be received");
-    }
-
-    function _forceFallback() internal pure returns (bytes memory) {
-        revert("fallback pls");
+        require(MockERC20(newAvaxAssetFtmLocalToken).balanceOf(address(18)) == 99 ether, "Tokens should be received");
     }
 
     function testRetrySettlementTriggerFallback() public {
@@ -2698,51 +2437,23 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
         prevNonceRoot = multicallRootBridgeAgent.settlementNonce();
 
-        //Prepare data
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-        bytes memory packedData;
-
-        {
-            outputToken = newAvaxAssetGlobalAddress;
-            amountOut = 99 ether;
-            depositOut = 0;
-
-            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
-
-            //Mock action
-            calls[0] = Multicall2.Call({
-                target: newAvaxAssetGlobalAddress,
-                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 1 ether)
-            });
-
-            //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
-
-            //dstChainId
-            uint16 dstChainId = ftmChainId;
-
-            //RLP Encode Calldata
-            bytes memory data = abi.encode(calls, outputParams, dstChainId, GasParams(800_000, 1 ether));
-
-            //Pack FuncId
-            packedData = abi.encodePacked(bytes1(0x02), data);
-        }
-
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
 
-        //Get some gas 5 AVAX.
-        vm.deal(address(this), 100 ether);
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Call Deposit function
         avaxMulticallBridgeAgent.retrySettlement{value: 100 ether}(
-            prevNonceBranch - 1, "jkladsjkldsajklads", [GasParams(1_000_000, 0.1 ether), GasParams(300_000, 0)], true
+            prevNonceBranch - 1, "a", [GasParams(1_000_000, 0.1 ether), GasParams(300_000, 5 ether)], true
         );
 
-        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
+        //Stop prank
+        vm.stopPrank();
 
-        console2.log("going root - retry settlement");
+        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
 
         switchToLzChain(rootChainId);
 
@@ -2754,8 +2465,6 @@ contract RootForkTest is LzForkTest {
         );
 
         switchToLzChain(ftmChainId);
-
-        console2.log("Going root after settlement fallback");
 
         switchToLzChain(rootChainId);
 
@@ -2770,10 +2479,16 @@ contract RootForkTest is LzForkTest {
         testRetrySettlementTriggerFallback();
 
         //Get some ether.
-        vm.deal(address(this), 1 ether);
+        vm.deal(address(18), 10 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Call Deposit function
-        multicallRootBridgeAgent.redeemSettlement(prevNonceRoot - 1);
+        multicallRootBridgeAgent.redeemSettlement(prevNonceRoot - 1, address(18));
+
+        //Stop prank
+        vm.stopPrank();
 
         require(
             multicallRootBridgeAgent.getSettlementEntry(prevNonceRoot).owner == address(0),
@@ -2793,7 +2508,7 @@ contract RootForkTest is LzForkTest {
         switchToLzChainWithoutExecutePendingOrPacketUpdate(rootChainId);
         prevNonceRoot = multicallRootBridgeAgent.settlementNonce();
 
-        //Prepare data
+        // Prepare data
         address outputToken;
         uint256 amountOut;
         uint256 depositOut;
@@ -2813,7 +2528,8 @@ contract RootForkTest is LzForkTest {
             });
 
             //Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(18), address(18), outputToken, amountOut, depositOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
@@ -2827,8 +2543,11 @@ contract RootForkTest is LzForkTest {
 
         switchToLzChainWithoutExecutePendingOrPacketUpdate(avaxChainId);
 
-        //Get some gas 5 AVAX.
-        vm.deal(address(this), 100 ether);
+        //Get some ether.
+        vm.deal(address(18), 100 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //     retrySettlement(
         //     uint32 _settlementNonce,
@@ -2842,9 +2561,10 @@ contract RootForkTest is LzForkTest {
             prevNonceBranch - 1, "jkladsjkldsajklads", [GasParams(1_000_000, 0.1 ether), GasParams(300_000, 0)], false
         );
 
-        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
+        //Stop prank
+        vm.stopPrank();
 
-        console2.log("going root - retry settlement");
+        require(prevNonceBranch == avaxMulticallBridgeAgent.depositNonce(), "Branch should not be udpated");
 
         switchToLzChain(rootChainId);
 
@@ -2856,8 +2576,6 @@ contract RootForkTest is LzForkTest {
         );
 
         switchToLzChain(ftmChainId);
-
-        console2.log("Going root after settlement failure");
 
         switchToLzChain(rootChainId);
 
@@ -2872,24 +2590,25 @@ contract RootForkTest is LzForkTest {
         testRetrySettlementNoFallback();
 
         //Get some ether.
-        vm.deal(address(this), 1 ether);
+        vm.deal(address(18), 10 ether);
+
+        //Prank address 18
+        vm.startPrank(address(18));
 
         //Call Deposit function
-        console2.log("retrieving");
         multicallRootBridgeAgent.retrieveSettlement{value: 1 ether}(prevNonceRoot - 1, GasParams(1_000_000, 0.1 ether));
+
+        //Stop prank
+        vm.stopPrank();
 
         require(
             multicallRootBridgeAgent.getSettlementEntry(prevNonceRoot).status == 0,
             "Settlement status should be success."
         );
 
-        console2.log("Going FTM to retrieve settlement");
         switchToLzChain(ftmChainId);
-        console2.log("Triggered Fallback");
 
-        console2.log("Returning ROOT");
         switchToLzChain(rootChainId);
-        console2.log("Done ROOT");
 
         require(
             multicallRootBridgeAgent.getSettlementEntry(prevNonceRoot - 1).status == 1,
@@ -2909,7 +2628,7 @@ contract RootForkTest is LzForkTest {
         uint256 _amount,
         uint256 _deposit
     ) private view {
-        // Cast to Dynamic TODO clean up
+        // Cast to Dynamic
         address[] memory hTokens = new address[](1);
         hTokens[0] = _hToken;
         address[] memory tokens = new address[](1);
@@ -2921,11 +2640,6 @@ contract RootForkTest is LzForkTest {
 
         // Get Deposit
         Deposit memory deposit = BranchBridgeAgent(payable(_bridgeAgent)).getDepositEntry(_depositNonce);
-
-        console2.log(deposit.hTokens[0], hTokens[0]);
-        console2.log(deposit.tokens[0], tokens[0]);
-        console2.log("owner", deposit.owner);
-        console2.log("user", _user);
 
         // Check deposit
         require(deposit.owner == _user, "Deposit owner doesn't match");
@@ -2948,6 +2662,467 @@ contract RootForkTest is LzForkTest {
         );
 
         require(deposit.status == 0, "Deposit status should be succesful.");
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                        BRANCH BRIDGE AGENT TESTS
+    ///////////////////////////////////////////////////////////////*/
+
+    // Internal Notation because we only do an external call for easier bytes handling
+    function _testRequiresEndpointBranch(
+        BranchBridgeAgent _branchBridgeAgent,
+        RootBridgeAgent _rootBridgeAgent,
+        address _lzEndpointAddress,
+        uint16 _rootChainId,
+        address _endpoint,
+        uint16 _srcChainId,
+        bytes calldata _path,
+        bytes calldata _payload
+    ) external {
+        if (_endpoint != _lzEndpointAddress) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedEndpoint.selector);
+        } else if (_path.length != 40) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedCaller.selector);
+        } else if (address(_rootBridgeAgent) != address(uint160(bytes20(_path[:20])))) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedCaller.selector);
+        } else if (_srcChainId != _rootChainId) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedCaller.selector);
+        } else if (_payload[0] == 0xFF) {
+            vm.expectRevert(IBranchBridgeAgent.UnknownFlag.selector);
+        }
+
+        // Call lzReceiveNonBlocking because lzReceive should never fail
+        vm.prank(address(_branchBridgeAgent));
+        _branchBridgeAgent.lzReceiveNonBlocking(_endpoint, _srcChainId, _path, _payload);
+    }
+
+    function testRequiresEndpointBranch() public {
+        switchToLzChain(avaxChainId);
+
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            rootChainId,
+            abi.encodePacked(multicallRootBridgeAgent, avaxMulticallBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_NotCallingItself() public {
+        switchToLzChain(avaxChainId);
+
+        vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedEndpoint.selector);
+        avaxMulticallBridgeAgent.lzReceiveNonBlocking(
+            lzEndpointAddress,
+            rootChainId,
+            abi.encodePacked(multicallRootBridgeAgent, avaxMulticallBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_srcAddress() public {
+        switchToLzChain(avaxChainId);
+
+        bytes memory _pathData = abi.encodePacked(address(0), address(0));
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            rootChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_srcAddress(address _srcAddress) public {
+        switchToLzChain(avaxChainId);
+
+        bytes memory _pathData = abi.encodePacked(_srcAddress, address(0));
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            rootChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_pathData() public {
+        switchToLzChain(avaxChainId);
+
+        bytes memory _pathData = abi.encodePacked(multicallRootBridgeAgent);
+
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            rootChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_pathData(bytes memory _pathData) public {
+        switchToLzChain(avaxChainId);
+
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            rootChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_srcChainId() public {
+        switchToLzChain(avaxChainId);
+
+        uint16 _srcChainId = 0;
+
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            _srcChainId,
+            abi.encodePacked(multicallRootBridgeAgent, avaxMulticallBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointBranch_srcChainId(uint16 _srcChainId) public {
+        switchToLzChain(avaxChainId);
+
+        this._testRequiresEndpointBranch(
+            avaxMulticallBridgeAgent,
+            multicallRootBridgeAgent,
+            lzEndpointAddress,
+            rootChainId,
+            lzEndpointAddress,
+            _srcChainId,
+            abi.encodePacked(multicallRootBridgeAgent, avaxMulticallBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                        ROOT BRIDGE AGENT TESTS
+    ///////////////////////////////////////////////////////////////*/
+
+    // Internal Notation because we only do an external call for easier bytes handling
+    function _testRequiresEndpointRoot(
+        RootBridgeAgent _rootBridgeAgent,
+        BranchBridgeAgent _branchBridgeAgent,
+        address _lzEndpointAddress,
+        uint16 _branchChainId,
+        address _endpoint,
+        uint16 _srcChainId,
+        bytes calldata _path,
+        bytes calldata _payload
+    ) external {
+        if (_endpoint != _lzEndpointAddress) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedEndpoint.selector);
+        } else if (_path.length != 40) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedCaller.selector);
+        } else if (address(_branchBridgeAgent) != address(uint160(bytes20(_path[:20])))) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedCaller.selector);
+        } else if (_srcChainId != _branchChainId) {
+            vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedCaller.selector);
+        } else if (_payload[0] == 0xFF) {
+            vm.expectRevert(IBranchBridgeAgent.UnknownFlag.selector);
+        }
+
+        // Call lzReceiveNonBlocking because lzReceive should never fail
+        vm.prank(address(_rootBridgeAgent));
+        _rootBridgeAgent.lzReceiveNonBlocking(_endpoint, _srcChainId, _path, _payload);
+    }
+
+    function testRequiresEndpointRoot() public {
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            avaxChainId,
+            abi.encodePacked(avaxMulticallBridgeAgent, multicallRootBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_NotCallingItself() public {
+        vm.expectRevert(IBranchBridgeAgent.LayerZeroUnauthorizedEndpoint.selector);
+        multicallRootBridgeAgent.lzReceiveNonBlocking(
+            lzEndpointAddress,
+            avaxChainId,
+            abi.encodePacked(avaxMulticallBridgeAgent, multicallRootBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_srcAddress() public {
+        bytes memory _pathData = abi.encodePacked(address(0), address(0));
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            avaxChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_srcAddress(address _srcAddress) public {
+        bytes memory _pathData = abi.encodePacked(_srcAddress, address(0));
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            avaxChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_pathData() public {
+        bytes memory _pathData = abi.encodePacked(avaxMulticallBridgeAgent);
+
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            avaxChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_pathData(bytes memory _pathData) public {
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            avaxChainId,
+            _pathData,
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_srcChainId() public {
+        uint16 _srcChainId = 0;
+
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            _srcChainId,
+            abi.encodePacked(avaxMulticallBridgeAgent, multicallRootBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function testRequiresEndpointRoot_srcChainId(uint16 _srcChainId) public {
+        this._testRequiresEndpointRoot(
+            multicallRootBridgeAgent,
+            avaxMulticallBridgeAgent,
+            lzEndpointAddress,
+            avaxChainId,
+            lzEndpointAddress,
+            _srcChainId,
+            abi.encodePacked(avaxMulticallBridgeAgent, multicallRootBridgeAgent),
+            abi.encodePacked(bytes1(0xFF))
+        );
+    }
+
+    function test_CallOutAndBridgeMultiple_withLocalToken() public {
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(avaxChainId);
+
+        MockERC20 underToken0 = new MockERC20("u0 token", "U0", 18);
+        MockERC20 underToken1 = new MockERC20("u0 token", "U0", 18);
+
+        vm.deal(address(this), 10 ether);
+        avaxCoreRouter.addLocalToken{value: 1 ether}(address(underToken0), GasParams(2_000_000, 0));
+        avaxCoreRouter.addLocalToken{value: 1 ether}(address(underToken1), GasParams(2_000_000, 0));
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(rootChainId);
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(avaxChainId);
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(rootChainId);
+        address localTokenUnder0 = rootPort.getLocalTokenFromUnderlying(address(underToken0), avaxChainId);
+        address localTokenUnder1 = rootPort.getLocalTokenFromUnderlying(address(underToken1), avaxChainId);
+
+        switchToLzChain(avaxChainId);
+
+        vm.deal(address(this), 50 ether);
+        uint256 _amount0 = 2 ether;
+        uint256 _amount1 = 2 ether;
+        uint256 _deposit0 = 1 ether;
+        uint256 _deposit1 = 1 ether;
+
+        // GasParams
+        GasParams memory gasParams = GasParams(1_250_000, 0 ether);
+
+        address _recipient = address(this);
+
+        underToken0.mint(_recipient, _deposit0);
+        underToken1.mint(_recipient, _deposit1);
+
+        address[] memory hTokens = new address[](2);
+        address[] memory tokens = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        uint256[] memory deposits = new uint256[](2);
+
+        hTokens[0] = localTokenUnder0;
+        hTokens[1] = localTokenUnder1;
+        tokens[0] = address(underToken0);
+        tokens[1] = address(underToken1);
+        amounts[0] = _amount0;
+        amounts[1] = _amount1;
+        deposits[0] = _deposit0;
+        deposits[1] = _deposit1;
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(rootChainId);
+
+        _getLocalhTokensToBranch(
+            GetLocalhTokensToBranchParams(
+                avaxChainId,
+                address(this),
+                _recipient,
+                hTokens,
+                tokens,
+                amounts,
+                deposits,
+                GasParams(2_250_000, 0.1 ether),
+                gasParams
+            )
+        );
+    }
+
+    function _test_CallOutAndBridgeMultiple_withLocalToken(
+        address[] memory hTokens,
+        address[] memory tokens,
+        uint256[] memory amounts,
+        uint256[] memory deposits,
+        GasParams memory gasParams
+    ) public {
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(avaxChainId);
+
+        // Prepare deposit info
+        DepositMultipleInput memory depositInput =
+            DepositMultipleInput({hTokens: hTokens, tokens: tokens, amounts: amounts, deposits: deposits});
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            MockERC20(tokens[i]).approve(address(avaxMulticallRouter), deposits[i]);
+        }
+
+        vm.deal(address(this), 50 ether);
+        // deposit multiple assets from Avax branch to Root
+        // Attempting to deposit two hTokens and two underlyingTokens
+        avaxMulticallRouter.callOutAndBridgeMultiple{value: 1 ether}(bytes(""), depositInput, gasParams);
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(rootChainId);
+    }
+
+    struct GetLocalhTokensToBranchParams {
+        uint16 branchChainId;
+        address owner;
+        address recipient;
+        address[] hTokensLocal;
+        address[] tokens;
+        uint256[] amounts;
+        uint256[] deposits;
+        GasParams gasParamsFromBranchToRoot;
+        GasParams gasParamsFromRootToBranch;
+    }
+
+    function _getLocalhTokensToBranch(GetLocalhTokensToBranchParams memory _params) internal {
+        address[] memory hTokensGlobal = new address[](_params.hTokensLocal.length);
+
+        for (uint256 i = 0; i < _params.hTokensLocal.length; i++) {
+            // Get Global Token
+            hTokensGlobal[i] = rootPort.getGlobalTokenFromLocal(_params.hTokensLocal[i], _params.branchChainId);
+        }
+
+        uint256[] memory hTokenDesiredBalance = new uint256[](_params.amounts.length);
+
+        for (uint256 i = 0; i < _params.amounts.length; i++) {
+            // Get local hToken amount
+            hTokenDesiredBalance[i] = _params.amounts[i] - _params.deposits[i];
+        }
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(avaxChainId);
+
+        OutputMultipleParams memory outputMultipleParams;
+        bytes memory routerPayload;
+
+        {
+            Multicall2.Call[] memory calls = new Multicall2.Call[](0);
+
+            {
+                uint256[] memory emptyDeposits = new uint256[](_params.amounts.length);
+
+                // Output Params
+                outputMultipleParams = OutputMultipleParams(
+                    _params.owner, _params.recipient, hTokensGlobal, hTokenDesiredBalance, emptyDeposits
+                );
+            }
+
+            routerPayload = abi.encodePacked(
+                bytes1(0x03),
+                abi.encode(calls, outputMultipleParams, _params.branchChainId, _params.gasParamsFromRootToBranch)
+            );
+        }
+
+        DepositMultipleInput memory depositInput = DepositMultipleInput({
+            hTokens: _params.hTokensLocal,
+            tokens: _params.tokens,
+            amounts: hTokenDesiredBalance,
+            deposits: hTokenDesiredBalance
+        });
+
+        for (uint256 i = 0; i < _params.tokens.length; i++) {
+            // Mint to owner
+            MockERC20(_params.tokens[i]).mint(_params.owner, hTokenDesiredBalance[0]);
+            // Approve spend by router
+            MockERC20(_params.tokens[i]).approve(address(avaxPort), hTokenDesiredBalance[0]);
+        }
+
+        avaxMulticallBridgeAgent.callOutSignedAndBridgeMultiple{value: 50 ether}(
+            routerPayload, depositInput, _params.gasParamsFromBranchToRoot, false
+        );
+
+        // Switch Chain and Execute Incoming Packets
+        switchToLzChain(rootChainId);
     }
 }
 

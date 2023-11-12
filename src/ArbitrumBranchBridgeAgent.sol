@@ -32,6 +32,7 @@ library DeployArbitrumBranchBridgeAgent {
  */
 contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
     using SafeTransferLib for address payable;
+
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     ///////////////////////////////////////////////////////////////*/
@@ -89,7 +90,9 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
 
     /// @inheritdoc IBranchBridgeAgent
     /// @dev This functionality should be accessed from Root environment
-    function retrySettlement(uint32, bytes calldata, GasParams[2] calldata, bool) external payable override lock {}
+    function retrySettlement(uint32, bytes calldata, GasParams[2] calldata, bool) external payable override {
+        revert();
+    }
 
     /*///////////////////////////////////////////////////////////////
                     LAYER ZERO INTERNAL FUNCTIONS
@@ -100,11 +103,8 @@ contract ArbitrumBranchBridgeAgent is BranchBridgeAgent {
      *  @param _calldata params for root bridge agent execution.
      */
     function _performCall(address payable, bytes memory _calldata, GasParams calldata, uint256) internal override {
-         // Send gas to rootBridgeAgentAddress
-        payable(rootBridgeAgentAddress).safeTransferAllETH();
-        
         // Execute locally and check for execution failure
-        if (!IRootBridgeAgent(rootBridgeAgentAddress).lzReceive(rootChainId, "", 0, _calldata)) {
+        if (!IRootBridgeAgent(rootBridgeAgentAddress).lzReceive{value: msg.value}(rootChainId, "", 0, _calldata)) {
             revert ExecutionFailure();
         }
     }

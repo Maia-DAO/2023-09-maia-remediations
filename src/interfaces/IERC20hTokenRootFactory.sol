@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ERC20hTokenRoot} from "../token/ERC20hTokenRoot.sol";
+import {ERC20hToken} from "../token/ERC20hToken.sol";
 
 /**
  * @title  Factory Contract for Root hTokens
@@ -13,7 +13,7 @@ import {ERC20hTokenRoot} from "../token/ERC20hTokenRoot.sol";
 interface IERC20hTokenRootFactory {
     /*///////////////////////////////////////////////////////////////
                             hTOKEN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to create a new hToken.
@@ -23,11 +23,11 @@ interface IERC20hTokenRootFactory {
      */
     function createToken(string memory _name, string memory _symbol, uint8 _decimals)
         external
-        returns (ERC20hTokenRoot newToken);
+        returns (ERC20hToken newToken);
 
     /*///////////////////////////////////////////////////////////////
                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     error UnrecognizedCoreRouterOrPort();
 }

@@ -59,7 +59,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
     /*///////////////////////////////////////////////////////////////
                             CONSTANTS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @dev Used for identifying cases when this contract's balance of a token is to be used as an input
     /// This value is equivalent to 1<<255, i.e. a singular 1 in the most significant bit.
@@ -67,7 +67,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
     /*///////////////////////////////////////////////////////////////
                     MULTICALL ROOT ROUTER STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Root Chain Layer Zero Identifier.
     uint256 public immutable localChainId;
@@ -89,7 +89,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Multicall Root Router.
@@ -109,7 +109,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
 
     /*///////////////////////////////////////////////////////////////
                         INITIALIZATION FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
     /**
      * @notice Initializes the Multicall Root Router.
      * @param _bridgeAgentAddress The address of the Bridge Agent.
@@ -196,7 +196,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        LAYERZERO FUNCTIONS
+                           LAYERZERO FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRootRouter
@@ -424,7 +424,7 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        MULTICALL FUNCTIONS
+                          MULTICALL FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
 
     /**
@@ -440,8 +440,9 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        INTERNAL HOOKS
-    ////////////////////////////////////////////////////////////*/
+                              INTERNAL HOOKS
+    ///////////////////////////////////////////////////////////////*/
+
     /**
      *  @notice Function to approve token spend before Bridge Agent interaction to Bridge Out of omnichain environment.
      *  @param settlementOwner settlement owner and excess gas receiver.
@@ -460,14 +461,11 @@ contract MulticallRootRouter is IRootRouter, Ownable {
         uint16 dstChainId,
         GasParams memory gasParams
     ) internal virtual {
-        // Save bridge agent address to memory
-        address _bridgeAgentAddress = bridgeAgentAddress;
-
         // Approve Root Port to spend/send output hTokens.
-        outputToken.safeApprove(_bridgeAgentAddress, amountOut);
+        outputToken.safeApprove(localPortAddress, amountOut - depositOut);
 
         //Move output hTokens from Root to Branch and call 'clearToken'.
-        IBridgeAgent(_bridgeAgentAddress).callOutAndBridge{value: msg.value}(
+        IBridgeAgent(bridgeAgentAddress).callOutAndBridge{value: msg.value}(
             payable(settlementOwner),
             recipient,
             dstChainId,
@@ -496,20 +494,17 @@ contract MulticallRootRouter is IRootRouter, Ownable {
         uint16 dstChainId,
         GasParams memory gasParams
     ) internal virtual {
-        // Save bridge agent address to memory
-        address _bridgeAgentAddress = bridgeAgentAddress;
-
         // For each output token
         for (uint256 i = 0; i < outputTokens.length;) {
             // Approve Root Port to spend output hTokens.
-            outputTokens[i].safeApprove(_bridgeAgentAddress, amountsOut[i]);
+            outputTokens[i].safeApprove(localPortAddress, amountsOut[i] - depositsOut[i]);
             unchecked {
                 ++i;
             }
         }
 
         //Move output hTokens from Root to Branch and call 'clearTokens'.
-        IBridgeAgent(_bridgeAgentAddress).callOutAndBridgeMultiple{value: msg.value}(
+        IBridgeAgent(bridgeAgentAddress).callOutAndBridgeMultiple{value: msg.value}(
             payable(settlementOwner),
             recipient,
             dstChainId,
@@ -529,8 +524,8 @@ contract MulticallRootRouter is IRootRouter, Ownable {
     }
 
     /*///////////////////////////////////////////////////////////////
-                            MODIFIERS
-    ////////////////////////////////////////////////////////////*/
+                                MODIFIERS
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Modifier for a simple re-entrancy check.
     modifier lock() {

@@ -134,8 +134,6 @@ abstract contract LzForkTest is Test {
         // Change RPCs using your .env file
         // Override setUp() if you don't want to set up Default Layer Zero Chains
 
-        console2.log("Setting up default fork chains...");
-
         // addChain(
         //     ForkChain(1, 101, 0x66A71Dcef29A0fFBDBE3c6a460a3B5BC225Cd675),
         //     string.concat(vm.envString("MAINNET_RPC_URL"), vm.envString("INFURA_API_KEY"))
@@ -143,7 +141,8 @@ abstract contract LzForkTest is Test {
 
         addChain(
             ForkChain(43114, 106, 0x3c2269811836af69497E5F486A85D7316753cf62),
-            string.concat(vm.envString("AVAX_RPC_URL"), vm.envString("INFURA_API_KEY")),
+            // string.concat(vm.envString("AVAX_RPC_URL"), vm.envString("INFURA_API_KEY")),
+            vm.envString("AVAX_RPC_URL"),
             35265612
         );
 
@@ -154,7 +153,8 @@ abstract contract LzForkTest is Test {
 
         addChain(
             ForkChain(42161, 110, 0x3c2269811836af69497E5F486A85D7316753cf62),
-            string.concat(vm.envString("ARBITRUM_RPC_URL"), vm.envString("INFURA_API_KEY")),
+            // string.concat(vm.envString("ARBITRUM_RPC_URL"), vm.envString("INFURA_API_KEY")),
+            vm.envString("ARBITRUM_RPC_URL"),
             131673916
         );
 
@@ -327,13 +327,9 @@ abstract contract LzForkTest is Test {
     function updatePackets() public {
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        console2.log("Events caugth:", entries.length);
-
         for (uint256 i = 0; i < entries.length; i++) {
             // Look for 'RelayerParams' events
             if (entries[i].topics[0] == RELAYER_PARAMS_EVENT_HASH) {
-                console2.log("Current entry", i);
-
                 //// 1. Decode Adapter Params
 
                 // Adapter Params Vars
@@ -345,19 +341,12 @@ abstract contract LzForkTest is Test {
 
                 relayerParams = RelayerParams(adapterParams, outboundProofType);
 
-                console2.log("RelayerParams event found", adapterParams.length);
-
                 //// 2. Increment to next event 'Packet'
                 i += 2;
-
-                console2.log("Found a Packet!");
 
                 //// 3. Decode new packet instance
                 (Packet memory packet, uint16 originLzChainId, uint16 destinationLzChainId) =
                     decodePacket(entries[i].data);
-
-                console2.log("Packet Payload:");
-                console2.logBytes(packet.payload);
 
                 //// 4. Get packet hash
                 bytes32 packetHash = encodePacket(packet);
@@ -380,8 +369,6 @@ abstract contract LzForkTest is Test {
 
                 // Attach Packet to Adapter Params
                 packetAdapterParams[packetHash] = AdapterParams(relayerAdapterParamsVersion, relayerParams);
-
-                console2.log("Added new Packet to storage");
             }
         }
     }
@@ -463,7 +450,7 @@ abstract contract LzForkTest is Test {
         vm.prank(receivingLibrary);
         ILayerZeroEndpoint(receivingEndpoint).receivePayload(
             packet.originLzChainId,
-            abi.encodePacked(packet.destinationUA, packet.originUA),
+            abi.encodePacked(packet.originUA, packet.destinationUA),
             packet.destinationUA,
             packet.nonce,
             gasLimit,
@@ -488,15 +475,12 @@ abstract contract LzForkTest is Test {
                 version := shr(240, mload(add(adapterParams, 32)))
             }
 
-            console2.log("Send Library Version: ", version);
-
             // Serve request according to relayerVersion
             if (version == 1) {
                 assembly ("memory-safe") {
                     // Load 32 bytes from adapterParams offsetting the first 2 bytes
                     gasLimit := mload(add(adapterParams, 34))
                 }
-                console2.log("Gas Limit: ", gasLimit);
             } else if (version == 2) {
                 uint256 nativeForDst;
                 address addressOnDst;
@@ -515,11 +499,7 @@ abstract contract LzForkTest is Test {
                         )
                 }
                 // Send gas airdrop
-                console2.log("Gas Limit: ", gasLimit);
-                console2.log("Native Receiver on Destination: ", addressOnDst);
-                console2.log("Native Amount for Destination: ", nativeForDst);
 
-                console2.log("Sending native token airdrop...");
                 deal(address(this), nativeForDst * tx.gasprice);
                 addressOnDst.call{value: nativeForDst * tx.gasprice}("");
             }

@@ -82,6 +82,50 @@ library RootPortHelper {
     }
 
     /*//////////////////////////////////////////////////////////////
+                           INIT CORE HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _initCore(
+        RootPort _rootPort,
+        RootBridgeAgent _coreRootBridgeAgent,
+        ArbitrumBranchBridgeAgent _coreLocalBranchBridgeAgent,
+        ArbitrumBranchPort _localBranchPortAddress
+    ) internal {
+        _rootPort.initializeCore(
+            address(_coreRootBridgeAgent), address(_coreLocalBranchBridgeAgent), address(_localBranchPortAddress)
+        );
+
+        _rootPort.check_initCore(_coreRootBridgeAgent, _localBranchPortAddress);
+    }
+
+    function check_initCore(
+        RootPort _rootPort,
+        RootBridgeAgent _coreRootBridgeAgent,
+        ArbitrumBranchPort _localBranchPortAddress
+    ) internal view {
+        _rootPort.check_coreRootBridgeAgent(_coreRootBridgeAgent);
+        _rootPort.check_localBranchPortAddress(_localBranchPortAddress);
+        _rootPort.check_addBridgeAgent(_coreRootBridgeAgent, _rootPort.owner());
+    }
+
+    function check_coreRootBridgeAgent(RootPort _rootPort, RootBridgeAgent _coreRootBridgeAgent) internal view {
+        require(
+            _rootPort.coreRootBridgeAgentAddress() == address(_coreRootBridgeAgent),
+            "Incorrect RootPort CoreRootBridgeAgent"
+        );
+    }
+
+    function check_localBranchPortAddress(RootPort _rootPort, ArbitrumBranchPort _localBranchPortAddress)
+        internal
+        view
+    {
+        require(
+            _rootPort.localBranchPortAddress() == address(_localBranchPortAddress),
+            "Incorrect RootPort LocalBranchPortAddress"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         ADD BRIDGE AGENT HELPERS
     //////////////////////////////////////////////////////////////*/
 
@@ -103,5 +147,106 @@ library RootPortHelper {
 
     function check_bridgeAgents(RootPort _rootPort, uint256 index, RootBridgeAgent _bridgeAgent) internal view {
         require(_rootPort.bridgeAgents(index) == address(_bridgeAgent), "Incorrect RootPort BridgeAgent");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          ADD NEW CHAIN HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _addNewChain(
+        RootPort _rootPort,
+        BranchBridgeAgent _coreBranchBridgeAgent,
+        uint16 _branchChainId,
+        string memory _name,
+        string memory _symbol,
+        uint8 _decimals,
+        address _branchLocalWrappedNativeToken,
+        address _branchWrappedNativeToken,
+        ERC20hTokenRootFactory _hTokenRootFactory
+    ) internal returns (address branchGlobalToken) {
+        uint256 hTokenIndex = _hTokenRootFactory.getHTokens().length;
+
+        _rootPort.addNewChain(
+            address(_coreBranchBridgeAgent),
+            _branchChainId,
+            _name,
+            _symbol,
+            _decimals,
+            _branchLocalWrappedNativeToken,
+            _branchWrappedNativeToken
+        );
+
+        branchGlobalToken = address(_hTokenRootFactory.hTokens(hTokenIndex));
+
+        RootPort rootPort = _rootPort;
+        rootPort.check_addNewChain(
+            _coreBranchBridgeAgent,
+            _branchChainId,
+            _name,
+            _symbol,
+            _decimals,
+            _branchLocalWrappedNativeToken,
+            _branchWrappedNativeToken,
+            branchGlobalToken
+        );
+    }
+
+    function check_addNewChain(
+        RootPort _rootPort,
+        BranchBridgeAgent _coreBranchBridgeAgent,
+        uint16 _branchChainId,
+        string memory _name,
+        string memory _symbol,
+        uint8 _decimals,
+        address _branchLocalWrappedNativeToken,
+        address _branchWrappedNativeToken,
+        address branchGlobalToken
+    ) internal view {
+        _rootPort.check_isGlobalAddress(branchGlobalToken);
+        _rootPort.check_globalTokenFromLocal(_branchChainId, _branchLocalWrappedNativeToken, branchGlobalToken);
+        _rootPort.check_localTokenFromGlobal(_branchChainId, branchGlobalToken, _branchLocalWrappedNativeToken);
+        _rootPort.check_underlyingTokenFromLocal(
+            _branchChainId, _branchLocalWrappedNativeToken, _branchWrappedNativeToken
+        );
+    }
+
+    function check_isGlobalAddress(RootPort _rootPort, address _globalToken) internal view {
+        require(_rootPort.isGlobalAddress(_globalToken), "Incorrect RootPort Global Token");
+    }
+
+    function check_globalTokenFromLocal(
+        RootPort _rootPort,
+        uint16 _branchChainId,
+        address _branchLocalToken,
+        address _globalToken
+    ) internal view {
+        require(
+            _rootPort.getGlobalTokenFromLocal(_branchLocalToken, _branchChainId) == _globalToken,
+            "Incorrect RootPort Global From Local Token"
+        );
+    }
+
+    function check_localTokenFromGlobal(
+        RootPort _rootPort,
+        uint16 _branchChainId,
+        address _globalToken,
+        address _branchLocalToken
+    ) internal view {
+        require(
+            _rootPort.getLocalTokenFromGlobal(_globalToken, _branchChainId) == _branchLocalToken,
+            "Incorrect RootPort Local From Global Token"
+        );
+    }
+
+    function check_underlyingTokenFromLocal(
+        RootPort _rootPort,
+        uint16 _branchChainId,
+        address _branchLocalToken,
+        address _branchUnderlyingToken
+    ) internal view {
+        require(
+            _rootPort.getUnderlyingTokenFromLocal(_branchLocalToken, _branchChainId) == _branchUnderlyingToken,
+            "Incorrect RootPort Underlying From Local Token"
+        );
     }
 }

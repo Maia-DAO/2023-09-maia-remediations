@@ -16,7 +16,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
     MockERC20 rewardToken;
 
-    ERC20hTokenRoot testToken;
+    ERC20hToken testToken;
 
     ERC20hTokenRootFactory hTokenFactory;
 
@@ -118,7 +118,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         setNewMulticallRootRouter();
 
-        hTokenFactory = new ERC20hTokenRootFactory(rootChainId, address(rootPort));
+        hTokenFactory = new ERC20hTokenRootFactory(address(rootPort));
 
         // Initialize Root Contracts
         rootPort.initialize(address(bridgeAgentFactory), address(rootCoreRouter));
@@ -140,7 +140,7 @@ contract MulticallRootRouterTest is DSTestPlus {
         // Deploy Local Branch Contracts
         localPortAddress = new ArbitrumBranchPort(rootChainId, address(rootPort), owner);
 
-        arbitrumMulticallRouter = new BaseBranchRouter();
+        arbitrumMulticallRouter = new ArbitrumBaseBranchRouter();
 
         arbitrumCoreRouter = new ArbitrumCoreBranchRouter();
 
@@ -239,20 +239,18 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         ftmGlobalToken = RootPort(rootPort).getGlobalTokenFromLocal(ftmLocalWrappedNativeTokenAddress, ftmChainId);
 
-        testToken = new ERC20hTokenRoot(
-            rootChainId,
-            address(bridgeAgentFactory),
+        testToken = new ERC20hToken(
             address(rootPort),
             "Hermes Global hToken 1",
             "hGT1",
             18
         );
 
-        // Ensure there are gas tokens from each chain in the system.
-        hevm.startPrank(address(rootPort));
-        ERC20hTokenRoot(avaxGlobalToken).mint(address(rootPort), 1 ether, avaxChainId);
-        ERC20hTokenRoot(ftmGlobalToken).mint(address(rootPort), 1 ether, ftmChainId);
-        hevm.stopPrank();
+        // // Ensure there are gas tokens from each chain in the system.
+        // hevm.startPrank(address(rootPort));
+        // ERC20hToken(avaxGlobalToken).mint(address(rootPort), 1 ether);
+        // ERC20hToken(ftmGlobalToken).mint(address(rootPort), 1 ether);
+        // hevm.stopPrank();
 
         require(
             RootPort(rootPort).getGlobalTokenFromLocal(address(avaxLocalWrappedNativeTokenAddress), avaxChainId)
@@ -428,7 +426,12 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         // Assure there are assets after mock action (mock previous branch port deposits)
         hevm.startPrank(address(rootPort));
-        ERC20hTokenRoot(newAvaxAssetGlobalAddress).mint(address(rootPort), 100 ether, avaxChainId);
+        ERC20hToken(newAvaxAssetGlobalAddress).mint(address(multicallBridgeAgent), 100 ether);
+        hevm.stopPrank();
+
+        hevm.startPrank(address(multicallBridgeAgent));
+        ERC20hToken(newAvaxAssetGlobalAddress).approve(address(rootPort), 100 ether);
+        rootPort.bridgeToBranch(address(multicallBridgeAgent), newAvaxAssetGlobalAddress, 100 ether, 0, ftmChainId);
         hevm.stopPrank();
 
         uint256 balanceFtmPortBefore = MockERC20(ftmGlobalToken).balanceOf(address(rootPort));
@@ -471,13 +474,6 @@ contract MulticallRootRouterTest is DSTestPlus {
 
     ////////////////////////////////////////////////////////////////////////// SINGLE OUTPUT ////////////////////////////////////////////////////////////////////
 
-    struct OutputParams {
-        address recipient;
-        address outputToken;
-        uint256 amountOut;
-        uint256 depositOut;
-    }
-
     function testMulticallNoCodeInTarget() public {
         // Add Local Token from Avax
         testSetLocalToken();
@@ -499,11 +495,12 @@ contract MulticallRootRouterTest is DSTestPlus {
             calls[0] = Multicall2.Call({target: 0x0000000000000000000000000000000000000000, callData: ""});
 
             // Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(this), address(this), outputToken, amountOut, depositOut);
 
             // Assure there are assets after mock action
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(ftmGlobalToken).mint(userVirtualAccount, 100 ether, ftmChainId);
+            ERC20hToken(ftmGlobalToken).mint(userVirtualAccount, 100 ether);
             hevm.stopPrank();
 
             //dstChainId
@@ -561,11 +558,12 @@ contract MulticallRootRouterTest is DSTestPlus {
             });
 
             // Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(this), address(this), outputToken, amountOut, depositOut);
 
             // Assure there are assets after mock action
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(ftmGlobalToken).mint(userVirtualAccount, 100 ether, ftmChainId);
+            ERC20hToken(ftmGlobalToken).mint(userVirtualAccount, 100 ether);
             hevm.stopPrank();
 
             // ToChain
@@ -628,11 +626,12 @@ contract MulticallRootRouterTest is DSTestPlus {
 
             // Assure there are assets for mock action
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(ftmGlobalToken).mint(userVirtualAccount, 100 ether, ftmChainId);
+            ERC20hToken(ftmGlobalToken).mint(userVirtualAccount, 100 ether);
             hevm.stopPrank();
 
             // Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(this), address(this), outputToken, amountOut, depositOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
@@ -698,11 +697,17 @@ contract MulticallRootRouterTest is DSTestPlus {
             });
 
             // Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(this), address(this), outputToken, amountOut, depositOut);
 
             // assure there are assets after mock action
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(newAvaxAssetGlobalAddress).mint(address(rootPort), 100 ether, avaxChainId);
+            ERC20hToken(newAvaxAssetGlobalAddress).mint(address(multicallBridgeAgent), 100 ether);
+            hevm.stopPrank();
+
+            hevm.startPrank(address(multicallBridgeAgent));
+            ERC20hToken(newAvaxAssetGlobalAddress).approve(address(rootPort), 100 ether);
+            rootPort.bridgeToBranch(address(multicallBridgeAgent), newAvaxAssetGlobalAddress, 100 ether, 0, ftmChainId);
             hevm.stopPrank();
 
             //dstChainId
@@ -766,7 +771,8 @@ contract MulticallRootRouterTest is DSTestPlus {
             });
 
             // Output Params
-            OutputParams memory outputParams = OutputParams(address(this), outputToken, amountOut, depositOut);
+            OutputParams memory outputParams =
+                OutputParams(address(this), address(this), outputToken, amountOut, depositOut);
 
             // RLP Encode Calldata
             bytes memory data = encodeCalls(abi.encode(calls, outputParams, ftmChainId));
@@ -789,7 +795,12 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         // Assure there are assets after mock action
         hevm.startPrank(address(rootPort));
-        ERC20hTokenRoot(newAvaxAssetGlobalAddress).mint(address(rootPort), 100 ether, avaxChainId);
+        ERC20hToken(newAvaxAssetGlobalAddress).mint(address(multicallBridgeAgent), 100 ether);
+        hevm.stopPrank();
+
+        hevm.startPrank(address(multicallBridgeAgent));
+        ERC20hToken(newAvaxAssetGlobalAddress).approve(address(rootPort), 100 ether);
+        rootPort.bridgeToBranch(address(multicallBridgeAgent), newAvaxAssetGlobalAddress, 100 ether, 0, ftmChainId);
         hevm.stopPrank();
 
         uint256 balanceFtmPortBefore = MockERC20(ftmGlobalToken).balanceOf(address(rootPort));
@@ -832,13 +843,6 @@ contract MulticallRootRouterTest is DSTestPlus {
 
     ////////////////////////////////////////////////////////////////////////// MULTIPLE OUTPUT ////////////////////////////////////////////////////////////////////
 
-    struct OutputMultipleParams {
-        address recipient;
-        address[] outputTokens;
-        uint256[] amountsOut;
-        uint256[] depositsOut;
-    }
-
     function testMulticallMultipleOutputNoDeposit() public {
         // Add Local Token from Avax
         testSetLocalToken();
@@ -872,12 +876,12 @@ contract MulticallRootRouterTest is DSTestPlus {
 
             // Output Params
             OutputMultipleParams memory outputMultipleParams =
-                OutputMultipleParams(address(this), outputTokens, amountsOut, depositsOut);
+                OutputMultipleParams(address(this), address(this), outputTokens, amountsOut, depositsOut);
 
             // Assure there are assets after mock action
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(avaxGlobalToken).mint(userVirtualAccount, 100 ether, avaxChainId);
-            ERC20hTokenRoot(newAvaxAssetGlobalAddress).mint(userVirtualAccount, 100 ether, avaxChainId);
+            ERC20hToken(avaxGlobalToken).mint(userVirtualAccount, 100 ether);
+            ERC20hToken(newAvaxAssetGlobalAddress).mint(userVirtualAccount, 100 ether);
             hevm.stopPrank();
 
             //dstChainId
@@ -937,8 +941,8 @@ contract MulticallRootRouterTest is DSTestPlus {
 
             // Assure there are assets after mock action
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(ftmGlobalToken).mint(address(userVirtualAccount), 100 ether, ftmChainId);
-            ERC20hTokenRoot(newAvaxAssetGlobalAddress).mint(address(userVirtualAccount), 100 ether, avaxChainId);
+            ERC20hToken(ftmGlobalToken).mint(address(userVirtualAccount), 100 ether);
+            ERC20hToken(newAvaxAssetGlobalAddress).mint(address(userVirtualAccount), 100 ether);
             hevm.stopPrank();
 
             Multicall2.Call[] memory calls = new Multicall2.Call[](1);
@@ -951,7 +955,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
             // Output Params
             OutputMultipleParams memory outputMultipleParams =
-                OutputMultipleParams(address(this), outputTokens, amountsOut, depositsOut);
+                OutputMultipleParams(address(this), address(this), outputTokens, amountsOut, depositsOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
@@ -1023,12 +1027,12 @@ contract MulticallRootRouterTest is DSTestPlus {
 
             // Get some tokens into Virtual Account to be created with this call
             hevm.startPrank(address(rootPort));
-            ERC20hTokenRoot(ftmGlobalToken).mint(userVirtualAccount, 150 ether, ftmChainId);
+            ERC20hToken(ftmGlobalToken).mint(userVirtualAccount, 150 ether);
             hevm.stopPrank();
 
             // Output Params
             OutputMultipleParams memory outputMultipleParams =
-                OutputMultipleParams(address(this), outputTokens, amountsOut, depositsOut);
+                OutputMultipleParams(address(this), address(this), outputTokens, amountsOut, depositsOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
@@ -1119,7 +1123,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
             // Output Params
             OutputMultipleParams memory outputMultipleParams =
-                OutputMultipleParams(address(this), outputTokens, amountsOut, depositsOut);
+                OutputMultipleParams(address(this), address(this), outputTokens, amountsOut, depositsOut);
 
             //dstChainId
             uint16 dstChainId = ftmChainId;
@@ -1146,7 +1150,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         // Assure there are assets after mock action
         hevm.startPrank(address(rootPort));
-        ERC20hTokenRoot(newAvaxAssetGlobalAddress).mint(address(rootPort), 100 ether, avaxChainId);
+        ERC20hToken(newAvaxAssetGlobalAddress).mint(address(multicallBridgeAgent), 100 ether);
         hevm.stopPrank();
 
         // Call Deposit function
@@ -1180,6 +1184,96 @@ contract MulticallRootRouterTest is DSTestPlus {
         require(balanceTokenMockAppAfter == 0, "Balance should be cleared");
     }
 
+    ////////////////////////////////////////////////////////////////////////// TEST INCREMENT AND DECREMENT BRANCHES ////////////////////////////////////////////////////////////////////
+
+    function testInvalidBranchhTokenMintSignedNoOutputDepositMultiple() public {
+        // Add Local Token from Avax
+        testSetLocalToken();
+
+        // Prepare data
+        address[] memory inputHTokenAddresses = new address[](2);
+        address[] memory inputTokenAddresses = new address[](2);
+        uint256[] memory inputTokenAmounts = new uint256[](2);
+        uint256[] memory inputTokenDeposits = new uint256[](2);
+        bytes memory packedData;
+
+        {
+            Multicall2.Call[] memory calls = new Multicall2.Call[](1);
+
+            // Prepare call to transfer 100 wAVAX from virtual account to Mock App
+            calls[0] = Multicall2.Call({
+                target: newAvaxAssetGlobalAddress,
+                callData: abi.encodeWithSelector(bytes4(0xa9059cbb), mockApp, 100 ether)
+            });
+
+            // RLP Encode Calldata
+            bytes memory data = encodeCalls(abi.encode(calls));
+
+            // Pack FuncId
+            packedData = abi.encodePacked(bytes1(0x01), data);
+
+            // Prepare input token arrays
+            inputHTokenAddresses[0] = address(newAvaxAssetLocalToken);
+            inputTokenAddresses[0] = address(avaxUnderlyingWrappedNativeTokenAddress);
+            inputTokenAmounts[0] = 100 ether;
+            inputTokenDeposits[0] = 0;
+
+            inputHTokenAddresses[1] = address(ftmLocalWrappedNativeTokenAddress);
+            inputTokenAddresses[1] = address(ftmUnderlyingWrappedNativeTokenAddress);
+            inputTokenAmounts[1] = 100 ether;
+            inputTokenDeposits[1] = 100 ether;
+        }
+
+        // Assure there are assets after mock action (mock previous branch port deposits)
+        hevm.startPrank(address(rootPort));
+        ERC20hToken(newAvaxAssetGlobalAddress).mint(address(multicallBridgeAgent), 100 ether);
+        hevm.stopPrank();
+
+        // hevm.startPrank(address(multicallBridgeAgent));
+        // ERC20hToken(newAvaxAssetGlobalAddress).approve(address(rootPort), 100 ether);
+        // rootPort.bridgeToBranch(address(multicallBridgeAgent), newAvaxAssetGlobalAddress, 100 ether, 0, ftmChainId);
+        // hevm.stopPrank();
+
+        uint256 balanceFtmPortBefore = MockERC20(ftmGlobalToken).balanceOf(address(rootPort));
+
+        hevm.expectRevert(abi.encodeWithSignature("InsufficientBalance"));
+
+        // Call Deposit function
+        encodeCallWithDepositMultiple(
+            payable(ftmMulticallBridgeAgentAddress),
+            payable(multicallBridgeAgent),
+            _encodeMultipleSigned(
+                1,
+                address(this),
+                inputHTokenAddresses,
+                inputTokenAddresses,
+                inputTokenAmounts,
+                inputTokenDeposits,
+                packedData
+            ),
+            GasParams(0.5 ether, 0.5 ether),
+            ftmChainId
+        );
+
+        // uint256 balanceTokenMockAppAfter = MockERC20(newAvaxAssetGlobalAddress).balanceOf(address(mockApp));
+        // uint256 balanceFtmMockAppAfter = MockERC20(ftmGlobalToken).balanceOf(address(mockApp));
+
+        // uint256 balanceTokenPortAfter = MockERC20(newAvaxAssetGlobalAddress).balanceOf(address(rootPort));
+        // uint256 balanceFtmPortAfter = MockERC20(ftmGlobalToken).balanceOf(address(rootPort));
+
+        // uint256 balanceTokenVirtualAccountAfter = MockERC20(newAvaxAssetGlobalAddress).balanceOf(userVirtualAccount);
+        // uint256 balanceFtmVirtualAccountAfter = MockERC20(ftmGlobalToken).balanceOf(userVirtualAccount);
+
+        // require(balanceTokenMockAppAfter == 100 ether, "Balance should be added");
+        // require(balanceFtmMockAppAfter == 0 ether, "Balance should stay equal");
+
+        // require(balanceTokenPortAfter == 0 ether, "Balance should stay equal");
+        // require(balanceFtmPortAfter == balanceFtmPortBefore, "Balance should stay equal");
+
+        // require(balanceTokenVirtualAccountAfter == 0 ether, "Balance should stay equal");
+        // require(balanceFtmVirtualAccountAfter == 100 ether, "Balance should be incremented");
+    }
+
     ////////////////////////////////////////////////////////////////////////// ADD TOKENS ////////////////////////////////////////////////////////////////////
 
     address public newAvaxAssetGlobalAddress;
@@ -1195,7 +1289,7 @@ contract MulticallRootRouterTest is DSTestPlus {
         uint256 balanceBefore = MockERC20(wrappedNativeToken).balanceOf(address(coreBridgeAgent));
 
         //Call Deposit function
-        encodeSystemCall(
+        encodeCallNoDeposit(
             payable(avaxCoreBridgeAgentAddress),
             payable(address(coreBridgeAgent)),
             uint32(1),
@@ -1267,7 +1361,7 @@ contract MulticallRootRouterTest is DSTestPlus {
         bytes memory packedData = abi.encodePacked(bytes1(0x03), data);
 
         // Call Deposit function
-        encodeSystemCall(
+        encodeCallNoDeposit(
             payable(ftmCoreBridgeAgentAddress),
             payable(address(coreBridgeAgent)),
             1,
@@ -1292,32 +1386,6 @@ contract MulticallRootRouterTest is DSTestPlus {
 
     //////////////////////////////////////////////////////////////////////////   HELPERS   ////////////////////////////////////////////////////////////////////
 
-    function encodeSystemCall(
-        address payable _fromBridgeAgent,
-        address payable _toBridgeAgent,
-        uint32,
-        bytes memory _data,
-        GasParams memory _gasParams,
-        uint16 _srcChainIdId
-    ) private {
-        //Get some gas
-        hevm.deal(lzEndpointAddress, _gasParams.gasLimit + _gasParams.remoteBranchExecutionGas);
-
-        // Prank into user account
-        hevm.startPrank(lzEndpointAddress);
-
-        //Encode Data
-        bytes memory inputCalldata = abi.encodePacked(bytes1(0x00), nonce++, _data);
-
-        _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
-        RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, inputCalldata
-        );
-
-        // Prank out of user account
-        hevm.stopPrank();
-    }
-
     function encodeCallNoDeposit(
         address payable _fromBridgeAgent,
         address payable _toBridgeAgent,
@@ -1337,7 +1405,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
         RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, inputCalldata
+            _srcChainIdId, abi.encodePacked(_fromBridgeAgent, _toBridgeAgent), 1, inputCalldata
         );
 
         // Prank out of user account
@@ -1363,7 +1431,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
         RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, inputCalldata
+            _srcChainIdId, abi.encodePacked(_fromBridgeAgent, _toBridgeAgent), 1, inputCalldata
         );
 
         // Prank out of user account
@@ -1385,7 +1453,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
         RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, _data
+            _srcChainIdId, abi.encodePacked(_fromBridgeAgent, _toBridgeAgent), 1, _data
         );
 
         // Prank out of user account
@@ -1407,7 +1475,7 @@ contract MulticallRootRouterTest is DSTestPlus {
 
         _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
         RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, _data
+            _srcChainIdId, abi.encodePacked(_fromBridgeAgent, _toBridgeAgent), 1, _data
         );
 
         // Prank out of user account

@@ -7,27 +7,29 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {IArbitrumBranchPort} from "./interfaces/IArbitrumBranchPort.sol";
 import {IRootPort} from "./interfaces/IRootPort.sol";
 
+import {AddressCodeSize} from "./lib/AddressCodeSize.sol";
+
 import {BranchPort} from "./BranchPort.sol";
 
 /// @title Arbitrum Branch Port Contract
 /// @author MaiaDAO
 contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
     using SafeTransferLib for address;
+    using AddressCodeSize for address;
 
     /*///////////////////////////////////////////////////////////////
                     ARBITRUM BRANCH PORT STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Local Network Identifier.
-    uint16 public immutable rootChainId;
+    uint16 public immutable override rootChainId;
 
-    /// @notice Address for Local Port Address
-    /// @dev where funds deposited from this chain are kept, managed and supplied to different Port Strategies.
-    address public immutable rootPortAddress;
+    /// @notice Address for Root Port Address
+    address public immutable override rootPortAddress;
 
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Arbitrum Branch Port.
@@ -44,7 +46,7 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
 
     /*///////////////////////////////////////////////////////////////
                         EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     ///@inheritdoc IArbitrumBranchPort
     function depositToPort(address _depositor, address _recipient, address _underlyingAddress, uint256 _deposit)
@@ -62,6 +64,8 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
         // Check if the global token exists
         if (_globalToken == address(0)) revert UnknownGlobalToken();
 
+        // Check if underlying address is a contract
+        if (_underlyingAddress.isEOA()) revert InvalidUnderlyingAddress();
         // Deposit Assets to Port
         _underlyingAddress.safeTransferFrom(_depositor, address(this), _deposit);
 
@@ -96,7 +100,7 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
 
     /*///////////////////////////////////////////////////////////////
                         INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Internal function to bridge in assets from the Root Chain.
@@ -123,16 +127,19 @@ contract ArbitrumBranchPort is BranchPort, IArbitrumBranchPort {
         uint256 _amount,
         uint256 _deposit
     ) internal override {
-        //Store Underlying Tokens
-        if (_deposit > 0) {
-            _underlyingAddress.safeTransferFrom(_depositor, address(this), _deposit);
-        }
-
-        //Burn hTokens if any are being used
+        // Burn hTokens if any are being used
         if (_amount - _deposit > 0) {
             unchecked {
                 IRootPort(rootPortAddress).bridgeToRootFromLocalBranch(_depositor, _localAddress, _amount - _deposit);
             }
+        }
+
+        // Store Underlying Tokens
+        if (_deposit > 0) {
+            // Check if underlying address is a contract
+            if (_underlyingAddress.isEOA()) revert InvalidUnderlyingAddress();
+
+            _underlyingAddress.safeTransferFrom(_depositor, address(this), _deposit);
         }
     }
 }

@@ -16,7 +16,7 @@ contract MulticallRootBridgeAgentTest is Test {
 
     MockERC20 rewardToken;
 
-    ERC20hTokenRoot testToken;
+    ERC20hToken testToken;
 
     ERC20hTokenRootFactory hTokenFactory;
 
@@ -115,7 +115,7 @@ contract MulticallRootBridgeAgentTest is Test {
             multicallAddress
         );
 
-        hTokenFactory = new ERC20hTokenRootFactory(rootChainId, address(rootPort));
+        hTokenFactory = new ERC20hTokenRootFactory(address(rootPort));
 
         // Initialize Root Contracts
         rootPort.initialize(address(bridgeAgentFactory), address(rootCoreRouter));
@@ -137,7 +137,7 @@ contract MulticallRootBridgeAgentTest is Test {
         // Deploy Local Branch Contracts
         localPortAddress = new ArbitrumBranchPort(rootChainId, address(rootPort), owner);
 
-        arbitrumMulticallRouter = new BaseBranchRouter();
+        arbitrumMulticallRouter = new ArbitrumBaseBranchRouter();
 
         arbitrumCoreRouter = new ArbitrumCoreBranchRouter();
 
@@ -236,13 +236,11 @@ contract MulticallRootBridgeAgentTest is Test {
 
         // Ensure there are gas tokens from each chain in the system.
         vm.startPrank(address(rootPort));
-        ERC20hTokenRoot(avaxGlobalToken).mint(address(rootPort), 1 ether, avaxChainId);
-        ERC20hTokenRoot(ftmGlobalToken).mint(address(rootPort), 1 ether, ftmChainId);
+        ERC20hToken(avaxGlobalToken).mint(address(rootPort), 1 ether);
+        ERC20hToken(ftmGlobalToken).mint(address(rootPort), 1 ether);
         vm.stopPrank();
 
-        testToken = new ERC20hTokenRoot(
-            rootChainId,
-            address(bridgeAgentFactory),
+        testToken = new ERC20hToken(
             address(rootPort),
             "Hermes Global hToken 1",
             "hGT1",
@@ -466,7 +464,7 @@ contract MulticallRootBridgeAgentTest is Test {
         uint32 _nonce = chainNonce[avaxChainId]++;
 
         //Call Deposit function
-        encodeSystemCall(
+        encodeCallNoDeposit(
             payable(avaxCoreBridgeAgentAddress),
             payable(address(coreBridgeAgent)),
             _nonce,
@@ -539,7 +537,7 @@ contract MulticallRootBridgeAgentTest is Test {
         bytes memory packedData = abi.encodePacked(bytes1(0x03), data);
 
         // Call Deposit function
-        encodeSystemCall(
+        encodeCallNoDeposit(
             payable(ftmCoreBridgeAgentAddress),
             payable(address(coreBridgeAgent)),
             chainNonce[ftmChainId]++,
@@ -569,36 +567,6 @@ contract MulticallRootBridgeAgentTest is Test {
 
     ////////////////////////////////////////////////////////////////////////// HELPERS ////////////////////////////////////////////////////////////////////
 
-    function encodeSystemCall(
-        address payable _fromBridgeAgent,
-        address payable _toBridgeAgent,
-        uint32 _nonce,
-        bytes memory _data,
-        GasParams memory _gasParams,
-        uint16 _srcChainIdId
-    ) private {
-        //Get some gas
-        vm.deal(address(lzEndpointAddress), _gasParams.gasLimit * tx.gasprice + _gasParams.remoteBranchExecutionGas);
-
-        //Encode Data
-        bytes memory inputCalldata = abi.encodePacked(bytes1(0x00), _nonce, _data);
-
-        uint256 depositExecutionStateBefore =
-            RootBridgeAgent(_toBridgeAgent).executionState(_srcChainIdId, chainNonce[_srcChainIdId] - 1);
-
-        require(depositExecutionStateBefore == 0, "Execution state should be 0");
-
-        // Prank into user account
-        vm.startPrank(lzEndpointAddress);
-
-        _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
-        RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, inputCalldata
-        );
-
-        vm.stopPrank();
-    }
-
     function encodeCallNoDeposit(
         address payable _fromBridgeAgent,
         address payable _toBridgeAgent,
@@ -618,7 +586,7 @@ contract MulticallRootBridgeAgentTest is Test {
         _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
 
         RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, inputCalldata
+            _srcChainIdId, abi.encodePacked(_fromBridgeAgent, _toBridgeAgent), 1, inputCalldata
         );
 
         // Prank out of user account
@@ -650,7 +618,7 @@ contract MulticallRootBridgeAgentTest is Test {
 
         _toBridgeAgent.call{value: _gasParams.remoteBranchExecutionGas}("");
         RootBridgeAgent(_toBridgeAgent).lzReceive{gas: _gasParams.gasLimit}(
-            _srcChainIdId, abi.encodePacked(_toBridgeAgent, _fromBridgeAgent), 1, inputCalldata
+            _srcChainIdId, abi.encodePacked(_fromBridgeAgent, _toBridgeAgent), 1, inputCalldata
         );
 
         // Prank out of user account

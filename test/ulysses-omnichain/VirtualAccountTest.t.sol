@@ -33,7 +33,8 @@ contract VirtualAccountTest is DSTestPlus {
     //////////////////////////////////////////////////////////////*/
 
     function _deployVirtualAccount(address _userAddress, address _localPortAddress) internal returns (VirtualAccount) {
-        return new VirtualAccount(_userAddress, _localPortAddress);
+        hevm.prank(_localPortAddress);
+        return new VirtualAccount(_userAddress);
     }
 
     function test_constructor(address _userAddress, address _localPortAddress)

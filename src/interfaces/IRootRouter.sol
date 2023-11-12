@@ -12,6 +12,18 @@ import {DepositParams, DepositMultipleParams, GasParams} from "../interfaces/IRo
  *         requests to Branch Chains, as well as in response to remote requests.
  */
 interface IRootRouter {
+    /*///////////////////////////////////////////////////////////////
+                            Router Functions
+    ///////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Function to execute Branch Bridge Agent initiated requests to retry a settlement.
+     * @param _settlementNonce settlement nonce.
+     * @param _recipient recipient address.
+     * @param _params data received from messaging layer.
+     * @param _gParams gas parameters.
+     * @param _hasFallbackToggled flag to indicate if fallback has been toggled.
+     */
     function retrySettlement(
         uint32 _settlementNonce,
         address _recipient,
@@ -45,9 +57,9 @@ interface IRootRouter {
     ) external payable;
 
     /**
-     *     @notice Function responsible of executing a crosschain request without any deposit.
-     *     @param params data received from messaging layer.
-     *     @param srcChainId chain where the request originated from.
+     *   @notice Function responsible of executing a crosschain request without any deposit.
+     *   @param params data received from messaging layer.
+     *   @param srcChainId chain where the request originated from.
      *
      */
     function execute(bytes memory params, uint16 srcChainId) external payable;
@@ -112,7 +124,7 @@ interface IRootRouter {
 
     /*///////////////////////////////////////////////////////////////
                              ERRORS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     error UnrecognizedFunctionId();
     error UnrecognizedBridgeAgent();

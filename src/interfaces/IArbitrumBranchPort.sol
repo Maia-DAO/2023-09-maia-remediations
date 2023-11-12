@@ -15,8 +15,8 @@ import {IBranchPort} from "./IBranchPort.sol";
  */
 interface IArbitrumBranchPort is IBranchPort {
     /*///////////////////////////////////////////////////////////////
-                    ARBITRUM BRANCH PORT STATE
-    //////////////////////////////////////////////////////////////*/
+                        ARBITRUM BRANCH PORT STATE
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Local Network Identifier.
     function rootChainId() external view returns (uint16);
@@ -25,8 +25,8 @@ interface IArbitrumBranchPort is IBranchPort {
     function rootPortAddress() external view returns (address);
 
     /*///////////////////////////////////////////////////////////////
-                        EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+                           EXTERNAL FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to deposit underlying/native token amount into Port in exchange for Local hToken.
@@ -49,8 +49,8 @@ interface IArbitrumBranchPort is IBranchPort {
         external;
 
     /*///////////////////////////////////////////////////////////////
-                            ERRORS
-    //////////////////////////////////////////////////////////////*/
+                                ERRORS
+    ///////////////////////////////////////////////////////////////*/
 
     error UnknownGlobalToken();
     error UnknownUnderlyingToken();

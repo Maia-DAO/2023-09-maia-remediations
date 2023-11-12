@@ -35,7 +35,7 @@ library RootBridgeAgentHelper {
     }
 
     function check_rootChainId(RootBridgeAgent _bridgeAgent, uint256 _rootChainId) internal view {
-        require(_bridgeAgent.localChainId() == _rootChainId, "Incorrect RootBridgeAgent Root Local Chain Id");
+        require(_bridgeAgent.localChainId() == _rootChainId, "Incorrect RootBridgeAgent Root Chain Id");
     }
 
     function check_lzEndpointAddress(RootBridgeAgent _bridgeAgent, address _lzEndpointAddress) internal view {
@@ -43,12 +43,24 @@ library RootBridgeAgentHelper {
     }
 
     function check_rootPort(RootBridgeAgent _bridgeAgent, RootPort _rootPort) internal view {
-        require(_bridgeAgent.localPortAddress() == address(_rootPort), "Incorrect RootBridgeAgent RootPort");
+        require(_bridgeAgent.rootPortAddress() == address(_rootPort), "Incorrect RootBridgeAgent RootPort");
     }
 
     function check_routerAddress(RootBridgeAgent _bridgeAgent, address _routerAddress) internal view {
-        require(
-            _bridgeAgent.localRouterAddress() == address(_routerAddress), "Incorrect RootBridgeAgent Router Address"
-        );
+        require(_bridgeAgent.rootRouterAddress() == address(_routerAddress), "Incorrect RootBridgeAgent Router Address");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ADD BRIDGE AGENT HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _approveBranchBridgeAgent(RootBridgeAgent _bridgeAgent, uint256 _branchChainId) internal {
+        _bridgeAgent.approveBranchBridgeAgent(_branchChainId);
+
+        _bridgeAgent.check_branchBridgeAgent(_branchChainId);
+    }
+
+    function check_branchBridgeAgent(RootBridgeAgent _bridgeAgent, uint256 _branchChainId) internal view {
+        require(_bridgeAgent.isBranchBridgeAgentAllowed(_branchChainId), "Incorrect RootBridgeAgent Branch Chain Id");
     }
 }

@@ -29,7 +29,7 @@ library ArbitrumBranchPortHelper {
     }
 
     function check_rootChainId(ArbitrumBranchPort _arbitrumPort, uint256 _rootChainId) internal view {
-        require(_arbitrumPort.localChainId() == _rootChainId, "Incorrect ArbitrumBranchPort Root Local Chain Id");
+        require(_arbitrumPort.rootChainId() == _rootChainId, "Incorrect ArbitrumBranchPort Root Local Chain Id");
     }
 
     function check_rootPort(ArbitrumBranchPort _arbitrumPort, RootPort _rootPort) internal view {
@@ -60,7 +60,6 @@ library ArbitrumBranchPortHelper {
         ArbitrumBranchBridgeAgentFactory _arbitrumBranchBridgeAgentFactory
     ) internal view {
         _arbitrumPort.check_arbitrumCoreBranchRouter(_arbitrumCoreBranchRouter);
-        _arbitrumPort.check_arbitrumBranchBridgeAgentFactory(0, _arbitrumBranchBridgeAgentFactory);
         _arbitrumPort.check_isArbitrumBranchBridgeAgentFactory(_arbitrumBranchBridgeAgentFactory);
     }
 
@@ -71,17 +70,6 @@ library ArbitrumBranchPortHelper {
         require(
             _arbitrumPort.coreBranchRouterAddress() == address(_arbitrumCoreBranchRouter),
             "Incorrect ArbitrumBranchPort ArbitrumCoreBranchRouter"
-        );
-    }
-
-    function check_arbitrumBranchBridgeAgentFactory(
-        ArbitrumBranchPort _arbitrumPort,
-        uint256 index,
-        ArbitrumBranchBridgeAgentFactory _arbitrumBranchBridgeAgentFactory
-    ) internal view {
-        require(
-            _arbitrumPort.bridgeAgentFactories(index) == address(_arbitrumBranchBridgeAgentFactory),
-            "Incorrect ArbitrumBranchPort ArbitrumBranchBridgeAgentFactory index"
         );
     }
 

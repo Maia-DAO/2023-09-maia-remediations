@@ -11,7 +11,7 @@ import {ICoreBranchRouter} from "./interfaces/ICoreBranchRouter.sol";
 import {IERC20hTokenBranchFactory as ITokenFactory} from "./interfaces/IERC20hTokenBranchFactory.sol";
 
 import {BaseBranchRouter} from "./BaseBranchRouter.sol";
-import {ERC20hTokenBranch as ERC20hToken} from "./token/ERC20hTokenBranch.sol";
+import {ERC20hToken} from "./token/ERC20hToken.sol";
 
 /// @title Core Branch Router Contract
 /// @author MaiaDAO
@@ -21,7 +21,7 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Core Branch Router.
@@ -33,7 +33,7 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                  TOKEN MANAGEMENT EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
     /**
      * @notice This function is used to add a global token to a branch.
      * @param _globalAddress Address of the token to be added.
@@ -80,7 +80,7 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                     LAYERZERO EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IBranchRouter
     function executeNoSettlement(bytes calldata _params) external payable virtual override requiresAgentExecutor {
@@ -117,30 +117,48 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
             _toggleBranchBridgeAgentFactory(bridgeAgentFactoryAddress);
 
-            /// _removeBranchBridgeAgent
+            /// _toggleStrategyToken
         } else if (_params[0] == 0x04) {
-            
-            /// _manageStrategyToken
+            (address underlyingToken, uint256 minimumReservesRatio) = abi.decode(_params[1:], (address, uint256));
+
+            _toggleStrategyToken(underlyingToken, minimumReservesRatio);
+
+            /// _updateStrategyToken
         } else if (_params[0] == 0x05) {
             (address underlyingToken, uint256 minimumReservesRatio) = abi.decode(_params[1:], (address, uint256));
 
-            _manageStrategyToken(underlyingToken, minimumReservesRatio);
+            _updateStrategyToken(underlyingToken, minimumReservesRatio);
 
-            /// _managePortStrategy
+            /// _togglePortStrategy
         } else if (_params[0] == 0x06) {
-            (address portStrategy, address underlyingToken, uint256 dailyManagementLimit, bool isUpdateDailyLimit) =
-                abi.decode(_params[1:], (address, address, uint256, bool));
+            (
+                address portStrategy,
+                address underlyingToken,
+                uint256 dailyManagementLimit,
+                uint256 reserveRatioManagementLimit
+            ) = abi.decode(_params[1:], (address, address, uint256, uint256));
 
-            _managePortStrategy(portStrategy, underlyingToken, dailyManagementLimit, isUpdateDailyLimit);
+            _togglePortStrategy(portStrategy, underlyingToken, dailyManagementLimit, reserveRatioManagementLimit);
+
+            /// _updatePortStrategy
+        } else if (_params[0] == 0x07) {
+            (
+                address portStrategy,
+                address underlyingToken,
+                uint256 dailyManagementLimit,
+                uint256 reserveRatioManagementLimit
+            ) = abi.decode(_params[1:], (address, address, uint256, uint256));
+
+            _updatePortStrategy(portStrategy, underlyingToken, dailyManagementLimit, reserveRatioManagementLimit);
 
             /// _setCoreBranchRouter
-        } else if (_params[0] == 0x07) {
+        } else if (_params[0] == 0x08) {
             (address coreBranchRouter, address coreBranchBridgeAgent) = abi.decode(_params[1:], (address, address));
 
             IPort(localPortAddress).setCoreBranchRouter(coreBranchRouter, coreBranchBridgeAgent);
 
             /// _sweep
-        } else if (_params[0] == 0x08) {
+        } else if (_params[0] == 0x09) {
             (address recipient) = abi.decode(_params[1:], (address));
 
             IPort(localPortAddress).sweep(recipient);
@@ -153,7 +171,7 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                  TOKEN MANAGEMENT INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to deploy/add a token already active in the global environment in the Root Chain.
@@ -190,14 +208,14 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
     /**
      * @notice Function to deploy/add a token already active in the global environment in the Root Chain.
      *         Must be called from another chain.
-     *    @param _newBranchRouter the address of the new branch router.
-     *    @param _branchBridgeAgentFactory the address of the branch bridge agent factory.
-     *    @param _rootBridgeAgent the address of the root bridge agent.
-     *    @param _rootBridgeAgentFactory the address of the root bridge agent factory.
-     *    @param _refundee the address of the excess gas receiver.
-     *    @param _gParams Gas parameters for remote execution.
-     *    @dev FUNC ID: 2
-     *    @dev all hTokens have 18 decimals.
+     *  @param _newBranchRouter the address of the new branch router.
+     *  @param _branchBridgeAgentFactory the address of the branch bridge agent factory.
+     *  @param _rootBridgeAgent the address of the root bridge agent.
+     *  @param _rootBridgeAgentFactory the address of the root bridge agent factory.
+     *  @param _refundee the address of the excess gas receiver.
+     *  @param _gParams Gas parameters for remote execution.
+     *  @dev FUNC ID: 2
+     *  @dev all hTokens have 18 decimals.
      */
     function _receiveAddBridgeAgent(
         address _newBranchRouter,
@@ -237,7 +255,7 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                  BRIDGE AGENT MANAGEMENT INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to add/deactivate a Branch Bridge Agent Factory.
@@ -245,71 +263,70 @@ contract CoreBranchRouter is ICoreBranchRouter, BaseBranchRouter {
      *  @dev FUNC ID: 3
      */
     function _toggleBranchBridgeAgentFactory(address _newBridgeAgentFactoryAddress) internal {
-        // Save Port Address to memory
-        address _localPortAddress = localPortAddress;
-
-        // Check if BridgeAgentFactory is active
-        if (IPort(_localPortAddress).isBridgeAgentFactory(_newBridgeAgentFactoryAddress)) {
-            // If so, disable it.
-            IPort(_localPortAddress).toggleBridgeAgentFactory(_newBridgeAgentFactoryAddress);
-        } else {
-            // If not, add it.
-            IPort(_localPortAddress).addBridgeAgentFactory(_newBridgeAgentFactoryAddress);
-        }
+        IPort(localPortAddress).toggleBridgeAgentFactory(_newBridgeAgentFactoryAddress);
     }
 
     /*///////////////////////////////////////////////////////////////
                  PORT STRATEGIES INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to add/remove a token to be used by Port Strategies.
      *  @param _underlyingToken the address of the underlying token.
      *  @param _minimumReservesRatio the minimum reserves ratio the Port must have.
-     *  @dev FUNC ID: 5
+     *  @dev FUNC ID: 4
      */
-    function _manageStrategyToken(address _underlyingToken, uint256 _minimumReservesRatio) internal {
-        // Save Port Address to memory
-        address _localPortAddress = localPortAddress;
-
-        // Check if the token is an active Strategy Token
-        if (IPort(_localPortAddress).isStrategyToken(_underlyingToken)) {
-            // If so, toggle it off.
-            IPort(_localPortAddress).toggleStrategyToken(_underlyingToken);
-        } else {
-            // If not, add it.
-            IPort(_localPortAddress).addStrategyToken(_underlyingToken, _minimumReservesRatio);
-        }
+    function _toggleStrategyToken(address _underlyingToken, uint256 _minimumReservesRatio) internal {
+        IPort(localPortAddress).toggleStrategyToken(_underlyingToken, _minimumReservesRatio);
     }
 
     /**
-     * @notice Function to deploy/add a token already active in the global environment in the Root Chain.
+     * @notice Function to update the minimum reserves ratio of a token to be used by Port Strategies.
+     *  @param _underlyingToken the address of the underlying token.
+     *  @param _minimumReservesRatio the minimum reserves ratio the Port must have.
+     *  @dev FUNC ID: 5
+     */
+    function _updateStrategyToken(address _underlyingToken, uint256 _minimumReservesRatio) internal {
+        IPort(localPortAddress).updateStrategyToken(_underlyingToken, _minimumReservesRatio);
+    }
+
+    /**
+     * @notice Function to add or remove a strategy that manages balances of a strategy token from this branch's port.
      *         Must be called from another chain.
      *  @param _portStrategy the address of the port strategy.
      *  @param _underlyingToken the address of the underlying token.
      *  @param _dailyManagementLimit the daily management limit.
-     *  @param _isUpdateDailyLimit if the daily limit is being updated.
+     *  @param _reserveRatioManagementLimit the reserve ratio management limit.
      *  @dev FUNC ID: 6
      */
-    function _managePortStrategy(
+    function _togglePortStrategy(
         address _portStrategy,
         address _underlyingToken,
         uint256 _dailyManagementLimit,
-        bool _isUpdateDailyLimit
+        uint256 _reserveRatioManagementLimit
     ) internal {
-        // Save Port Address to memory
-        address _localPortAddress = localPortAddress;
+        IPort(localPortAddress).togglePortStrategy(
+            _portStrategy, _underlyingToken, _dailyManagementLimit, _reserveRatioManagementLimit
+        );
+    }
 
-        // Check if Port Strategy is active
-        if (!IPort(_localPortAddress).isPortStrategy(_portStrategy, _underlyingToken)) {
-            // If Port Strategy is not active, add new Port Strategy.
-            IPort(_localPortAddress).addPortStrategy(_portStrategy, _underlyingToken, _dailyManagementLimit);
-        } else if (_isUpdateDailyLimit) {
-            // Or update daily limit.
-            IPort(_localPortAddress).updatePortStrategy(_portStrategy, _underlyingToken, _dailyManagementLimit);
-        } else {
-            // Or Toggle Port Strategy.
-            IPort(_localPortAddress).togglePortStrategy(_portStrategy, _underlyingToken);
-        }
+    /**
+     * @notice Function to update a strategy that manages balances of a strategy token from this branch's port.
+     *         Must be called from another chain.
+     *  @param _portStrategy the address of the port strategy.
+     *  @param _underlyingToken the address of the underlying token.
+     *  @param _dailyManagementLimit the daily management limit.
+     *  @param _reserveRatioManagementLimit the reserve ratio management limit.
+     *  @dev FUNC ID: 7
+     */
+    function _updatePortStrategy(
+        address _portStrategy,
+        address _underlyingToken,
+        uint256 _dailyManagementLimit,
+        uint256 _reserveRatioManagementLimit
+    ) internal {
+        IPort(localPortAddress).updatePortStrategy(
+            _portStrategy, _underlyingToken, _dailyManagementLimit, _reserveRatioManagementLimit
+        );
     }
 }

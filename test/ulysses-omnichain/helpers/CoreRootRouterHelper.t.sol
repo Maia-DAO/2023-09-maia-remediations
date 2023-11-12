@@ -88,4 +88,28 @@ library CoreRootRouterHelper {
             "Incorrect CoreRootRouter hTokenFactoryAddress"
         );
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        ADD BRIDGE AGENT HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _addBranchToBridgeAgent(
+        CoreRootRouter _coreRootRouter,
+        RootBridgeAgent _rootBridgeAgent,
+        BranchBridgeAgentFactory _branchBridgeAgentFactory,
+        BaseBranchRouter _newBranchRouter,
+        address _refundee,
+        uint16 _dstChainId,
+        GasParams[2] memory _gParams,
+        uint256 msgvalue
+    ) internal {
+        _coreRootRouter.addBranchToBridgeAgent{value: msgvalue}(
+            address(_rootBridgeAgent),
+            address(_branchBridgeAgentFactory),
+            address(_newBranchRouter),
+            _refundee,
+            _dstChainId,
+            _gParams
+        );
+    }
 }

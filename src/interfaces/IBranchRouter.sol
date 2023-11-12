@@ -21,7 +21,7 @@ import {
 interface IBranchRouter {
     /*///////////////////////////////////////////////////////////////
                             VIEW / STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice External function to return the Branch Chain's Local Port Address.
     function localPortAddress() external view returns (address);
@@ -34,11 +34,11 @@ interface IBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                         EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to perform a call to the Root Omnichain Router without token deposit.
-     *   @param params RLP enconded parameters to execute on the root chain.
+     *   @param params enconded parameters to execute on the root chain.
      *   @param gParams gas parameters for the cross-chain call.
      *   @dev ACTION ID: 1 (Call without deposit)
      *
@@ -88,26 +88,26 @@ interface IBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                         LAYERZERO EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function responsible of executing a branch router response.
-     *     @param params data received from messaging layer.
+     *   @param params data received from messaging layer.
      */
     function executeNoSettlement(bytes calldata params) external payable;
 
     /**
      * @dev Function responsible of executing a crosschain request without any deposit.
-     *     @param params data received from messaging layer.
-     *     @param sParams SettlementParams struct.
+     *   @param params data received from messaging layer.
+     *   @param sParams SettlementParams struct.
      */
     function executeSettlement(bytes calldata params, SettlementParams calldata sParams) external payable;
 
     /**
      * @dev Function responsible of executing a crosschain request which contains
      *      cross-chain deposit information attached.
-     *     @param params data received from messaging layer.
-     *     @param sParams SettlementParams struct containing deposit information.
+     *   @param params data received from messaging layer.
+     *   @param sParams SettlementParams struct containing deposit information.
      *
      */
     function executeSettlementMultiple(bytes calldata params, SettlementMultipleParams calldata sParams)
@@ -116,7 +116,7 @@ interface IBranchRouter {
 
     /*///////////////////////////////////////////////////////////////
                              ERRORS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     error UnrecognizedFunctionId();
 

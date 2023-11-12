@@ -8,13 +8,13 @@ import {ExcessivelySafeCall} from "lib/ExcessivelySafeCall.sol";
 import {ILayerZeroEndpoint} from "./interfaces/ILayerZeroEndpoint.sol";
 
 import {IBranchBridgeAgent} from "./interfaces/IBranchBridgeAgent.sol";
-import {IERC20hTokenRoot} from "./interfaces/IERC20hTokenRoot.sol";
 
 import {BridgeAgentConstants} from "./interfaces/BridgeAgentConstants.sol";
 import {
     GasParams,
     DepositParams,
     DepositMultipleParams,
+    ILayerZeroReceiver,
     IRootBridgeAgent,
     Settlement,
     SettlementInput,
@@ -23,14 +23,35 @@ import {
 
 import {IRootPort as IPort} from "./interfaces/IRootPort.sol";
 
+import {AddressCodeSize} from "./lib/AddressCodeSize.sol";
+
 import {VirtualAccount} from "./VirtualAccount.sol";
 import {DeployRootBridgeAgentExecutor, IRouter, RootBridgeAgentExecutor} from "./RootBridgeAgentExecutor.sol";
+
+/// @title Library for Root Bridge Agent Deployment
+library DeployRootBridgeAgent {
+    function deploy(
+        uint16 _localChainId,
+        address _lzEndpointAddress,
+        address _rootPortAddress,
+        address _rootRouterAddress
+    ) external returns (RootBridgeAgent) {
+        return new RootBridgeAgent(
+            _localChainId,
+            _lzEndpointAddress,
+            _rootPortAddress,
+            _rootRouterAddress
+        );
+    }
+}
 
 /// @title Root Bridge Agent Contract
 /// @author MaiaDAO
 contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
     using SafeTransferLib for address;
     using ExcessivelySafeCall for address;
+    using AddressCodeSize for address;
+
     /*///////////////////////////////////////////////////////////////
                         ROOT BRIDGE AGENT STATE
     ///////////////////////////////////////////////////////////////*/
@@ -53,9 +74,12 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
     /// @notice Address of Root Bridge Agent Executor.
     address public immutable bridgeAgentExecutorAddress;
 
+    /// @notice Address of the pending Root Bridge Agent Manager.
+    address public pendingBridgeAgentManagerAddress;
+
     /*///////////////////////////////////////////////////////////////
                         BRANCH BRIDGE AGENTS STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Chain -> Branch Bridge Agent Address. For N chains, each Root Bridge Agent Address has M =< N Branch Bridge Agent Address.
     mapping(uint256 chainId => address branchBridgeAgent) public getBranchBridgeAgent;
@@ -68,9 +92,9 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /*///////////////////////////////////////////////////////////////
                             SETTLEMENTS STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Deposit nonce used for identifying transaction.
+    /// @notice Deposit nonce used for identifying the transaction.
     uint32 public settlementNonce;
 
     /// @notice Mapping from Settlement nonce to Settlement Struct.
@@ -78,28 +102,28 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /*///////////////////////////////////////////////////////////////
                             EXECUTOR STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
-    /// @notice If true, bridge agent has already served a request with this nonce from  a given chain. Chain -> Nonce -> Bool
+    /// @notice If true, the bridge agent has already served a request with this nonce from  a given chain. Chain -> Nonce -> Bool
     mapping(uint256 chainId => mapping(uint256 nonce => uint256 state)) public executionState;
 
     /*///////////////////////////////////////////////////////////////
                             REENTRANCY STATE
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Re-entrancy lock modifier state.
     uint256 internal _unlocked = 1;
 
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Bridge Agent.
-     *     @param _localChainId Local Chain Id.
-     *     @param _lzEndpointAddress Local Layerzero Endpoint Address.
-     *     @param _rootPortAddress Local Port Address.
-     *     @param _rootRouterAddress Local Port Address.
+     *   @param _localChainId Local Chain Id.
+     *   @param _lzEndpointAddress Local Layerzero Endpoint Address.
+     *   @param _rootPortAddress Local Port Address.
+     *   @param _rootRouterAddress Local Port Address.
      */
     constructor(
         uint16 _localChainId,
@@ -107,9 +131,9 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         address _rootPortAddress,
         address _rootRouterAddress
     ) {
-        if (_lzEndpointAddress == address(0)) revert(); // TODO: Add custom errors "Layerzero Enpoint Address cannot be zero address");
-        if (_rootPortAddress == address(0)) revert(); // TODO: Add custom errors "Port Address cannot be zero address");
-        if (_rootRouterAddress == address(0)) revert(); // TODO: Add custom errors "Router Address cannot be zero address");
+        if (_lzEndpointAddress == address(0)) revert();
+        if (_rootPortAddress == address(0)) revert();
+        if (_rootRouterAddress == address(0)) revert();
 
         factoryAddress = msg.sender;
         localChainId = _localChainId;
@@ -122,38 +146,22 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /*///////////////////////////////////////////////////////////////
                         FALLBACK FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     receive() external payable {}
 
     /*///////////////////////////////////////////////////////////////
                         VIEW EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRootBridgeAgent
     function getSettlementEntry(uint32 _settlementNonce) external view override returns (Settlement memory) {
         return getSettlement[_settlementNonce];
     }
 
-    /// @inheritdoc IRootBridgeAgent
-    function getFeeEstimate(
-        uint256 _gasLimit,
-        uint256 _remoteBranchExecutionGas,
-        bytes calldata _payload,
-        uint16 _dstChainId
-    ) external view returns (uint256 _fee) {
-        (_fee,) = ILayerZeroEndpoint(lzEndpointAddress).estimateFees(
-            _dstChainId,
-            address(this),
-            _payload,
-            false,
-            abi.encodePacked(uint16(2), _gasLimit, _remoteBranchExecutionGas, getBranchBridgeAgent[_dstChainId])
-        );
-    }
-
     /*///////////////////////////////////////////////////////////////
                     ROOT ROUTER EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRootBridgeAgent
     function callOut(
@@ -246,7 +254,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /// @inheritdoc IRootBridgeAgent
     function retrySettlement(
-        address _owner,
+        address _settlementOwnerAndGasRefundee,
         uint32 _settlementNonce,
         address _recipient,
         bytes calldata _params,
@@ -254,35 +262,26 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         bool _hasFallbackToggled
     ) external payable override requiresRouter lock {
         // Get storage reference
-        Settlement storage settlementReference = getSettlement[_settlementNonce];
+        Settlement storage settlement = getSettlement[_settlementNonce];
 
-        // Check if Settlement hasn't been redeemed.
-        if (settlementReference.owner == address(0)) revert SettlementRetryUnavailable();
+        // Check if Settlement is not already redeemed and if caller is allowed to retry settlement.
+        _checkSettlementOwner(_settlementOwnerAndGasRefundee, settlement.owner);
 
-        if (_owner != settlementReference.owner) {
-            // Don't allow a contract's virtual Accounts to retry settlements
-            if (isContract(settlementReference.owner)) revert NotSettlementOwner();
-
-            if (_owner != address(IPort(rootPortAddress).getUserAccount(settlementReference.owner))) {
-                revert NotSettlementOwner();
-            }
-        }
-
-        // Update Settlement Status
-        settlementReference.status = STATUS_SUCCESS;
+        // Check if deposit is not failed and in redeem mode
+        if (settlement.status == STATUS_FAILED) revert SettlementRetryUnavailable();
 
         // Perform Settlement Retry
-        _performRetrySettlementCall(
+        _retrySettlement(
             _hasFallbackToggled,
-            settlementReference.hTokens,
-            settlementReference.tokens,
-            settlementReference.amounts,
-            settlementReference.deposits,
+            settlement.hTokens,
+            settlement.tokens,
+            settlement.amounts,
+            settlement.deposits,
             _params,
             _settlementNonce,
-            payable(settlementReference.owner),
+            payable(settlement.owner),
             _recipient,
-            settlementReference.dstChainId,
+            settlement.dstChainId,
             _gParams
         );
     }
@@ -290,54 +289,34 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
     /// @inheritdoc IRootBridgeAgent
     function retrieveSettlement(uint32 _settlementNonce, GasParams calldata _gParams) external payable lock {
         //Get settlement storage reference
-        Settlement storage settlementReference = getSettlement[_settlementNonce];
+        Settlement storage settlement = getSettlement[_settlementNonce];
 
         // Get Settlement owner.
-        address settlementOwner = settlementReference.owner;
+        address settlementOwner = settlement.owner;
 
-        // Check if Settlement is Retrieve.
-        if (settlementOwner == address(0)) revert SettlementRetrieveUnavailable();
+        // Check if Settlement is not already retrieved.
+        if (settlement.status == STATUS_FAILED) revert SettlementRedeemUnavailable();
 
-        // Check Settlement Owner
-        if (msg.sender != settlementOwner) {
-            // Don't allow a contract's virtual Accounts to retry settlements
-            if (isContract(settlementOwner)) revert NotSettlementOwner();
-
-            if (msg.sender != address(IPort(rootPortAddress).getUserAccount(settlementOwner))) {
-                revert NotSettlementOwner();
-            }
-        }
+        // Check if Settlement is not already redeemed and if caller is allowed to retry settlement.
+        _checkSettlementOwner(msg.sender, settlement.owner);
 
         //Encode Data for cross-chain call.
         bytes memory payload = abi.encodePacked(bytes1(0x04), settlementOwner, _settlementNonce);
 
         //Retrieve Deposit
-        _performCall(
-            settlementReference.dstChainId, payable(settlementOwner), payload, _gParams, ROOT_BASE_CALL_OUT_GAS
-        );
+        _performCall(settlement.dstChainId, payable(settlementOwner), payload, _gParams, ROOT_BASE_CALL_OUT_GAS);
     }
 
     /// @inheritdoc IRootBridgeAgent
-    function redeemSettlement(uint32 _settlementNonce) external override lock {
+    function redeemSettlement(uint32 _settlementNonce, address _recipient) external override lock {
         // Get setttlement storage reference
         Settlement storage settlement = getSettlement[_settlementNonce];
 
-        // Get deposit owner.
-        address settlementOwner = settlement.owner;
-
         // Check if Settlement is redeemable.
         if (settlement.status == STATUS_SUCCESS) revert SettlementRedeemUnavailable();
-        if (settlementOwner == address(0)) revert SettlementRedeemUnavailable();
 
-        // Check if Settlement Owner is msg.sender or msg.sender is the virtual account of the settlement owner.
-        if (msg.sender != settlementOwner) {
-            // Don't allow a contract's virtual Accounts to retry settlements
-            if (isContract(settlementOwner)) revert NotSettlementOwner();
-
-            if (msg.sender != address(IPort(rootPortAddress).getUserAccount(settlementOwner))) {
-                revert NotSettlementOwner();
-            }
-        }
+        // Check if Settlement is not already redeemed and if caller is allowed to retry settlement.
+        _checkSettlementOwner(msg.sender, settlement.owner);
 
         // Clear Global hTokens To Recipient on Root Chain cancelling Settlement to Branch
         for (uint256 i = 0; i < settlement.hTokens.length;) {
@@ -351,7 +330,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
                 // Move hTokens from Branch to Root + Mint Sufficient hTokens to match new port deposit
                 IPort(rootPortAddress).bridgeToRoot(
-                    msg.sender,
+                    _recipient,
                     IPort(rootPortAddress).getGlobalTokenFromLocal(_hToken, _dstChainId),
                     settlement.amounts[i],
                     settlement.deposits[i],
@@ -381,27 +360,24 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         // Deposit can't be greater than amount.
         if (_dParams.amount < _dParams.deposit) revert InvalidInputParams();
 
-        // Cache local port address
-        address _rootPortAddress = rootPortAddress;
-
         // Check local exists.
         if (_dParams.amount > 0) {
-            if (!IPort(_rootPortAddress).isLocalToken(_dParams.hToken, _srcChainId)) {
+            if (!IPort(rootPortAddress).isLocalToken(_dParams.hToken, _srcChainId)) {
                 revert InvalidInputParams();
             }
         }
 
         // Check underlying exists.
         if (_dParams.deposit > 0) {
-            if (IPort(_rootPortAddress).getLocalTokenFromUnderlying(_dParams.token, _srcChainId) != _dParams.hToken) {
+            if (IPort(rootPortAddress).getLocalTokenFromUnderlying(_dParams.token, _srcChainId) != _dParams.hToken) {
                 revert InvalidInputParams();
             }
         }
 
         // Move hTokens from Branch to Root + Mint Sufficient hTokens to match new port deposit
-        IPort(_rootPortAddress).bridgeToRoot(
+        IPort(rootPortAddress).bridgeToRoot(
             _recipient,
-            IPort(_rootPortAddress).getGlobalTokenFromLocal(_dParams.hToken, _srcChainId),
+            IPort(rootPortAddress).getGlobalTokenFromLocal(_dParams.hToken, _srcChainId),
             _dParams.amount,
             _dParams.deposit,
             _srcChainId
@@ -442,16 +418,18 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /*///////////////////////////////////////////////////////////////
                     LAYER ZERO EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IRootBridgeAgent
+    /// @inheritdoc ILayerZeroReceiver
     function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64, bytes calldata _payload)
         public
+        payable
+        override
         returns (bool success)
     {
         // Perform Excessively Safe Call
         (success,) = address(this).excessivelySafeCall(
-            gasleft() - 40349, // TODO: Subtract minimum gas
+            gasleft() - 40349,
             0,
             abi.encodeWithSelector(this.lzReceiveNonBlocking.selector, msg.sender, _srcChainId, _srcAddress, _payload)
         );
@@ -460,13 +438,13 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         if (!success) rootPortAddress.safeTransferAllETH();
     }
 
-    /// @inheritdoc IRootBridgeAgent
+    /// @inheritdoc ILayerZeroReceiver
     function lzReceiveNonBlocking(
         address _endpoint,
         uint16 _srcChainId,
         bytes calldata _srcAddress,
         bytes calldata _payload
-    ) public override requiresEndpoint(_endpoint, _srcChainId, _srcAddress) {
+    ) public payable override requiresEndpoint(_endpoint, _srcChainId, _srcAddress) {
         // Deposit Nonce
         uint32 nonce;
 
@@ -484,12 +462,10 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
             uint16 srcChainId = _srcChainId;
 
             // Try to execute remote request
-            // Flag 1 - bridgeAgentExecutor.executeNoDeposit(rootRouterAddress, payload, _srcChainId)
+            // Flag 1 - bridgeAgentExecutor.executeNoDeposit(payload, _srcChainId)
             _execute(
                 nonce,
-                abi.encodeWithSelector(
-                    RootBridgeAgentExecutor.executeNoDeposit.selector, rootRouterAddress, _payload, srcChainId
-                ),
+                abi.encodeWithSelector(RootBridgeAgentExecutor.executeNoDeposit.selector, _payload, srcChainId),
                 srcChainId
             );
 
@@ -507,12 +483,10 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
             uint16 srcChainId = _srcChainId;
 
             // Try to execute remote request
-            // Flag 2 - bridgeAgentExecutor.executeWithDeposit(rootRouterAddress, _payload, _srcChainId)
+            // Flag 2 - bridgeAgentExecutor.executeWithDeposit(_payload, _srcChainId)
             _execute(
                 nonce,
-                abi.encodeWithSelector(
-                    RootBridgeAgentExecutor.executeWithDeposit.selector, rootRouterAddress, _payload, srcChainId
-                ),
+                abi.encodeWithSelector(RootBridgeAgentExecutor.executeWithDeposit.selector, _payload, srcChainId),
                 srcChainId
             );
 
@@ -530,11 +504,11 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
             uint16 srcChainId = _srcChainId;
 
             // Try to execute remote request
-            // Flag 3 - bridgeAgentExecutor.executeWithDepositMultiple(rootRouterAddress, _payload, _srcChainId)
+            // Flag 3 - bridgeAgentExecutor.executeWithDepositMultiple(_payload, _srcChainId)
             _execute(
                 nonce,
                 abi.encodeWithSelector(
-                    RootBridgeAgentExecutor.executeWithDepositMultiple.selector, rootRouterAddress, _payload, srcChainId
+                    RootBridgeAgentExecutor.executeWithDepositMultiple.selector, _payload, srcChainId
                 ),
                 srcChainId
             );
@@ -561,15 +535,11 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
             uint16 srcChainId = _srcChainId;
 
             // Try to execute remote request
-            // Flag 4 - bridgeAgentExecutor.executeSignedNoDeposit(address(userAccount), rootRouterAddress, data, _srcChainId
+            // Flag 4 - bridgeAgentExecutor.executeSignedNoDeposit(_userAccount, _payload, _srcChainId)
             _execute(
                 nonce,
                 abi.encodeWithSelector(
-                    RootBridgeAgentExecutor.executeSignedNoDeposit.selector,
-                    address(userAccount),
-                    rootRouterAddress,
-                    _payload,
-                    srcChainId
+                    RootBridgeAgentExecutor.executeSignedNoDeposit.selector, address(userAccount), _payload, srcChainId
                 ),
                 srcChainId
             );
@@ -599,7 +569,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
             uint16 srcChainId = _srcChainId;
 
             // Try to execute remote request
-            // Flag 5 - bridgeAgentExecutor.executeSignedWithDeposit(address(userAccount), rootRouterAddress, data, _srcChainId)
+            // Flag 5 - bridgeAgentExecutor.executeSignedWithDeposit(_userAccount, _payload, _srcChainId)
             _execute(
                 _payload[0] == 0x85,
                 nonce,
@@ -607,7 +577,6 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
                 abi.encodeWithSelector(
                     RootBridgeAgentExecutor.executeSignedWithDeposit.selector,
                     address(userAccount),
-                    rootRouterAddress,
                     _payload,
                     srcChainId
                 ),
@@ -639,7 +608,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
             uint16 srcChainId = _srcChainId;
 
             // Try to execute remote request
-            // Flag 6 - bridgeAgentExecutor.executeSignedWithDepositMultiple(address(userAccount), rootRouterAddress, data, _srcChainId)
+            // Flag 6 - bridgeAgentExecutor.executeSignedWithDepositMultiple(_userAccount, _payload, _srcChainId)
             _execute(
                 _payload[0] == 0x86,
                 nonce,
@@ -647,7 +616,6 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
                 abi.encodeWithSelector(
                     RootBridgeAgentExecutor.executeSignedWithDepositMultiple.selector,
                     address(userAccount),
-                    rootRouterAddress,
                     _payload,
                     srcChainId
                 ),
@@ -723,6 +691,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         emit LogExecute(nonce, _srcChainId);
     }
 
+    /// @inheritdoc ILayerZeroReceiver
     function forceResumeReceive(uint16 _srcChainId, bytes calldata _srcAddress) external {
         // Anyone can call this function to force resume a receive and unblock the messaging layer channel.
         ILayerZeroEndpoint(lzEndpointAddress).forceResumeReceive(_srcChainId, _srcAddress);
@@ -730,7 +699,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /*///////////////////////////////////////////////////////////////
                 DEPOSIT EXECUTION INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Internal function requests execution from Root Bridge Agent Executor Contract.
@@ -753,35 +722,39 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
      * @notice Internal function requests execution from Root Bridge Agent Executor Contract.
      *   @param _hasFallbackToggled if true, fallback on execution failure is toggled on.
      *   @param _depositNonce Identifier for nonce being executed.
-     *   @param _refundee address to refund gas to in case of fallback being triggered.
+     *   @param _gasRefundee address to refund gas to in case of fallback being triggered.
      *   @param _calldata Calldata to be executed by the Root Bridge Agent Executor Contract.
      *   @param _srcChainId Chain ID of source chain where request originates from.
      */
     function _execute(
         bool _hasFallbackToggled,
         uint32 _depositNonce,
-        address _refundee,
+        address _gasRefundee,
         bytes memory _calldata,
         uint16 _srcChainId
     ) private {
-        //Update tx state as executed
+        // Update tx state as executed
         executionState[_srcChainId][_depositNonce] = STATUS_DONE;
 
-        //Try to execute the remote request
-        (bool success,) = bridgeAgentExecutorAddress.call{value: address(this).balance}(_calldata);
+        if (_hasFallbackToggled) {
+            //Try to execute the remote request
+            (bool success,) =
+                bridgeAgentExecutorAddress.call{gas: gasleft() - 50_000, value: address(this).balance}(_calldata);
 
-        //Update tx state if execution failed
-        if (!success) {
-            //Read the fallback flag.
-            if (_hasFallbackToggled) {
+            // Update tx state if execution failed
+            if (!success) {
                 // Update tx state as retrieve only
                 executionState[_srcChainId][_depositNonce] = STATUS_RETRIEVE;
+
                 // Perform the fallback call
-                _performFallbackCall(payable(_refundee), _depositNonce, _srcChainId);
-            } else {
-                // No fallback is requested revert allowing for retry.
-                revert ExecutionFailure();
+                _performFallbackCall(payable(_gasRefundee), _depositNonce, _srcChainId);
             }
+        } else {
+            // Try to execute the remote request
+            (bool success,) = bridgeAgentExecutorAddress.call{value: address(this).balance}(_calldata);
+
+            // Revert if execution failed
+            if (!success) revert ExecutionFailure();
         }
     }
 
@@ -840,141 +813,51 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
                 _encodeAdapterParams(_gParams, _baseExecutionGas, callee)
             );
         } else {
-            //Send Gas to Local Branch Bridge Agent
-            callee.call{value: msg.value}("");
-
-            //Execute locally
-            IBranchBridgeAgent(callee).lzReceive(0, "", 0, _payload);
-        }
-    }
-
-    /**
-     * @notice Internal function performs call to Layer Zero Endpoint Contract for cross-chain messaging.
-     *   @param _hasFallbackToggled if true, fallback is toggled on.
-     *   @param _hTokens deposited global token address.
-     *   @param _tokens deposited global token address.
-     *   @param _amounts amounts of total hTokens + Tokens output.
-     *   @param _deposits amount of underlying/native tokens to output.
-     *   @param _params Payload of message to be sent to Layer Zero Endpoint Contract.
-     *   @param _gParams Gas parameters for cross-chain message execution.
-     *   @param _settlementNonce Identifier for token settlement.
-     *   @param _refundee address of token owner and gas refundee.
-     *   @param _recipient destination chain receiver address.
-     *   @param _dstChainId Chain ID of destination chain.
-     */
-
-    function _performRetrySettlementCall(
-        bool _hasFallbackToggled,
-        address[] memory _hTokens,
-        address[] memory _tokens,
-        uint256[] memory _amounts,
-        uint256[] memory _deposits,
-        bytes calldata _params,
-        uint32 _settlementNonce,
-        address payable _refundee,
-        address _recipient,
-        uint16 _dstChainId,
-        GasParams calldata _gParams
-    ) internal {
-        // Check if payload is ready for message
-        if (_hTokens.length == 0) revert SettlementRetryUnavailableUseCallout();
-
-        // Get packed data
-        bytes memory payload;
-
-        // Check if it's a single asset settlement
-        if (_hTokens.length == 1) {
-            //Pack new Data
-            payload = abi.encodePacked(
-                _hasFallbackToggled ? bytes1(0x82) : bytes1(0x02),
-                _recipient,
-                _settlementNonce,
-                _hTokens[0],
-                _tokens[0],
-                _amounts[0],
-                _deposits[0],
-                _params
-            );
-
-            // Check if it's mulitple asset settlement
-        } else if (_hTokens.length > 1) {
-            //Pack new Data
-            payload = abi.encodePacked(
-                _hasFallbackToggled ? bytes1(0x83) : bytes1(0x03),
-                _recipient,
-                uint8(_hTokens.length),
-                _settlementNonce,
-                _hTokens,
-                _tokens,
-                _amounts,
-                _deposits,
-                _params
-            );
-        }
-
-        // Get destination Branch Bridge Agent
-        address callee = getBranchBridgeAgent[_dstChainId];
-
-        // Check if valid destination
-        if (callee == address(0)) revert UnrecognizedBridgeAgent();
-
-        // Check if call to remote chain
-        if (_dstChainId != localChainId) {
-            //Sends message to Layerzero Enpoint
-            ILayerZeroEndpoint(lzEndpointAddress).send{value: msg.value}(
-                _dstChainId,
-                getBranchBridgeAgentPath[_dstChainId],
-                payload,
-                payable(_refundee),
-                address(0),
-                abi.encodePacked(uint16(2), _gParams.gasLimit, _gParams.remoteBranchExecutionGas, callee)
-            );
-
-            // Check if call to local chain
-        } else {
-            //Send Gas to Local Branch Bridge Agent
-            callee.call{value: msg.value}("");
-            //Execute locally
-            IBranchBridgeAgent(callee).lzReceive(0, "", 0, payload);
+            // Send Gas to Local Branch Bridge Agent and execute call
+            IBranchBridgeAgent(callee).lzReceive{value: msg.value}(0, "", 0, _payload);
         }
     }
 
     /**
      * @notice Internal function performs call to Layerzero Enpoint Contract for cross-chain messaging.
+     *   @param _gasRefundee address to refund excess gas to.
      *   @param _depositNonce branch deposit nonce.
      *   @param _dstChainId Chain ID of destination chain.
      */
-    function _performFallbackCall(address payable _refundee, uint32 _depositNonce, uint16 _dstChainId) internal {
-        //Sends message to LayerZero messaging layer
+    function _performFallbackCall(address payable _gasRefundee, uint32 _depositNonce, uint16 _dstChainId) internal {
+        // Revert if local chain
+        if (_dstChainId == localChainId) revert ExecutionFailure();
+
+        // Sends message to LayerZero messaging layer
         ILayerZeroEndpoint(lzEndpointAddress).send{value: address(this).balance}(
             _dstChainId,
             getBranchBridgeAgentPath[_dstChainId],
             abi.encodePacked(bytes1(0x05), _depositNonce),
-            payable(_refundee),
+            payable(_gasRefundee),
             address(0),
-            ""
+            abi.encodePacked(uint16(1), uint256(100_000))
         );
     }
 
     /*///////////////////////////////////////////////////////////////
                     SETTLEMENT INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to settle a single asset and perform a remote call to a branch chain.
-     *     @param _settlementNonce Identifier for token settlement.
-     *     @param _refundee address of token owner and gas refundee.
-     *     @param _recipient destination chain token receiver address.
-     *     @param _dstChainId branch chain to bridge to.
-     *     @param _params params for branch bridge agent and router execution.
-     *     @param _globalAddress global address of the token in root chain.
-     *     @param _amount amount of hTokens to be bridged out.
-     *     @param _deposit amount of underlying tokens to be cleared from branch port.
-     *     @param _hasFallbackToggled if true, fallback is toggled on.
+     *   @param _settlementNonce Identifier for token settlement.
+     *   @param _settlementOwner address of settlement owner.
+     *   @param _recipient destination chain token receiver address.
+     *   @param _dstChainId branch chain to bridge to.
+     *   @param _params params for branch bridge agent and router execution.
+     *   @param _globalAddress global address of the token in root chain.
+     *   @param _amount amount of hTokens to be bridged out.
+     *   @param _deposit amount of underlying tokens to be cleared from branch port.
+     *   @param _hasFallbackToggled if true, fallback is toggled on.
      */
     function _createSettlement(
         uint32 _settlementNonce,
-        address payable _refundee,
+        address _settlementOwner,
         address _recipient,
         uint16 _dstChainId,
         bytes memory _params,
@@ -1020,7 +903,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         Settlement storage settlement = getSettlement[cachedSettlementNonce];
 
         // Update Setttlement
-        settlement.owner = _refundee;
+        settlement.owner = _settlementOwner;
         settlement.recipient = _recipient;
 
         addressArray[0] = localAddress;
@@ -1041,19 +924,19 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
 
     /**
      * @notice Function to settle multiple assets and perform a remote call to a branch chain.
-     *     @param _settlementNonce Identifier for token settlement.
-     *     @param _refundee address of token owner and gas refundee.
-     *     @param _recipient destination chain token receiver address.
-     *     @param _dstChainId branch chain to bridge to.
-     *     @param _globalAddresses addresses of the global tokens in root chain.
-     *     @param _amounts amounts of hTokens to be bridged out.
-     *     @param _deposits amounts of underlying tokens to be cleared from branch port.
-     *     @param _params params for branch bridge agent and router execution.
-     *     @param _hasFallbackToggled if true, fallback is toggled on.
+     *   @param _settlementNonce Identifier for token settlement.
+     *   @param _settlementOwner address of settlement owner.
+     *   @param _recipient destination chain token receiver address.
+     *   @param _dstChainId branch chain to bridge to.
+     *   @param _globalAddresses addresses of the global tokens in root chain.
+     *   @param _amounts amounts of hTokens to be bridged out.
+     *   @param _deposits amounts of underlying tokens to be cleared from branch port.
+     *   @param _params params for branch bridge agent and router execution.
+     *   @param _hasFallbackToggled if true, fallback is toggled on.
      */
     function _createSettlementMultiple(
         uint32 _settlementNonce,
-        address payable _refundee,
+        address _settlementOwner,
         address _recipient,
         uint16 _dstChainId,
         address[] memory _globalAddresses,
@@ -1112,7 +995,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         Settlement storage settlement = getSettlement[_settlementNonce];
 
         // Update Setttlement
-        settlement.owner = _refundee;
+        settlement.owner = _settlementOwner;
         settlement.recipient = _recipient;
         settlement.hTokens = hTokens;
         settlement.tokens = tokens;
@@ -1120,6 +1003,114 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         settlement.deposits = _deposits;
         settlement.dstChainId = _dstChainId;
         settlement.status = STATUS_SUCCESS;
+    }
+
+    /**
+     * @notice Internal function performs call to Layer Zero Endpoint Contract for cross-chain messaging.
+     *   @param _hasFallbackToggled if true, fallback is toggled on.
+     *   @param _hTokens deposited global token address.
+     *   @param _tokens deposited global token address.
+     *   @param _amounts amounts of total hTokens + Tokens output.
+     *   @param _deposits amount of underlying/native tokens to output.
+     *   @param _params Payload of message to be sent to Layer Zero Endpoint Contract.
+     *   @param _settlementNonce Identifier for token settlement.
+     *   @param _gasRefundee address of token owner and gas refundee.
+     *   @param _recipient destination chain receiver address.
+     *   @param _dstChainId Chain ID of destination chain.
+     *   @param _gParams Gas parameters for cross-chain message execution.
+     */
+
+    function _retrySettlement(
+        bool _hasFallbackToggled,
+        address[] memory _hTokens,
+        address[] memory _tokens,
+        uint256[] memory _amounts,
+        uint256[] memory _deposits,
+        bytes calldata _params,
+        uint32 _settlementNonce,
+        address payable _gasRefundee,
+        address _recipient,
+        uint16 _dstChainId,
+        GasParams calldata _gParams
+    ) internal {
+        // Check if payload is ready for message
+        if (_hTokens.length == 0) revert SettlementRetryUnavailableUseCallout();
+
+        // Get packed data
+        bytes memory payload;
+
+        // Check if it's a single asset settlement
+        if (_hTokens.length == 1) {
+            // Pack new payload
+            payload = abi.encodePacked(
+                _hasFallbackToggled ? bytes1(0x82) : bytes1(0x02),
+                _recipient,
+                _settlementNonce,
+                _hTokens[0],
+                _tokens[0],
+                _amounts[0],
+                _deposits[0],
+                _params
+            );
+
+            // Prevent stack-too-deep
+            bool hasFallbackToggled = _hasFallbackToggled;
+
+            // Perform Retry Settlement Call
+            _performCall(
+                _dstChainId,
+                _gasRefundee,
+                payload,
+                _gParams,
+                hasFallbackToggled
+                    ? ROOT_BASE_CALL_OUT_DEPOSIT_SINGLE_GAS + BASE_FALLBACK_GAS
+                    : ROOT_BASE_CALL_OUT_DEPOSIT_SINGLE_GAS
+            );
+
+            // Check if it's mulitple asset settlement
+        } else if (_hTokens.length > 1) {
+            // Pack new payload
+            payload = abi.encodePacked(
+                _hasFallbackToggled ? bytes1(0x83) : bytes1(0x03),
+                _recipient,
+                uint8(_hTokens.length),
+                _settlementNonce,
+                _hTokens,
+                _tokens,
+                _amounts,
+                _deposits,
+                _params
+            );
+
+            // Prevent stack-too-deep
+            bool hasFallbackToggled = _hasFallbackToggled;
+
+            // Perform Retry Settlement Call
+            _performCall(
+                _dstChainId,
+                _gasRefundee,
+                payload,
+                _gParams,
+                hasFallbackToggled
+                    ? ROOT_BASE_CALL_OUT_DEPOSIT_MULTIPLE_GAS + BASE_FALLBACK_GAS
+                    : ROOT_BASE_CALL_OUT_DEPOSIT_MULTIPLE_GAS
+            );
+        }
+    }
+
+    function _checkSettlementOwner(address caller, address settlementOwner) internal view {
+        // Check if Settlement is not already redeemed.
+        if (settlementOwner == address(0)) revert NotSettlementOwner();
+
+        // Check if the caller is the Settlement Owner or the virtual account of the settlement owner.
+        if (caller != settlementOwner) {
+            // Don't allow a contract's virtual Accounts to retry settlements
+            if (settlementOwner.isContract()) revert ContractsVirtualAccountNotAllowed();
+
+            if (caller != address(IPort(rootPortAddress).getUserAccount(settlementOwner))) {
+                revert NotSettlementOwner();
+            }
+        }
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -1148,39 +1139,13 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
     ) internal {
         // Check if valid inputs
         if (_amount == 0) revert InvalidInputParams();
-        if (_amount < _deposit) revert InvalidInputParams();
 
         // Check if valid assets
         if (_localAddress == address(0)) revert UnrecognizedLocalAddress();
         if (_underlyingAddress == address(0)) if (_deposit > 0) revert UnrecognizedUnderlyingAddress();
 
-        // Move output hTokens from Root to Branch
-        if (_amount - _deposit > 0) {
-            unchecked {
-                _globalAddress.safeTransferFrom(_depositor, rootPortAddress, _amount - _deposit);
-            }
-        }
-
-        // Clear Underlying Tokens from the destination Branch
-        if (_deposit > 0) {
-            // Verify there is enough balance to clear native tokens if needed
-            if (IERC20hTokenRoot(_globalAddress).getTokenBalance(_dstChainId) < _deposit) {
-                revert InsufficientBalanceForSettlement();
-            }
-            IPort(rootPortAddress).burn(_depositor, _globalAddress, _deposit, _dstChainId);
-        }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            INTERNAL HELPERS
-    //////////////////////////////////////////////////////////////*/
-
-    function isContract(address addr) internal view returns (bool) {
-        uint256 size;
-        assembly {
-            size := extcodesize(addr)
-        }
-        return size > 0;
+        // Move output hTokens from Root to Branch and Clear Underlying Tokens from the destination Branch
+        IPort(rootPortAddress).bridgeToBranch(_depositor, _globalAddress, _amount, _deposit, _dstChainId);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -1203,6 +1168,22 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         getBranchBridgeAgentPath[_branchChainId] = abi.encodePacked(_newBranchBridgeAgent, address(this));
     }
 
+    /// @inheritdoc IRootBridgeAgent
+    function transferManagementRole(address _newManager) external override requiresManager {
+        // Check if valid address
+        if (_newManager == address(0)) revert InvalidInputParams();
+        // Update pending manager
+        pendingBridgeAgentManagerAddress = _newManager;
+    }
+
+    /// @inheritdoc IRootBridgeAgent
+    function acceptManagementRole() external override {
+        // Check if caller is pending manager
+        if (msg.sender != pendingBridgeAgentManagerAddress) revert UnrecognizedBridgeAgentManager();
+        // Update manager
+        IPort(rootPortAddress).setBridgeAgentManager(msg.sender);
+    }
+
     /*///////////////////////////////////////////////////////////////
                             MODIFIERS
     ///////////////////////////////////////////////////////////////*/
@@ -1221,7 +1202,7 @@ contract RootBridgeAgent is IRootBridgeAgent, BridgeAgentConstants {
         _;
     }
 
-     /// @notice Modifier verifies the caller is the Layerzero Enpoint or Local Branch Bridge Agent.
+    /// @notice Modifier verifies the caller is the Layerzero Enpoint or Local Branch Bridge Agent.
     modifier requiresEndpoint(address _endpoint, uint16 _srcChain, bytes calldata _srcAddress) virtual {
         if (msg.sender != address(this)) revert LayerZeroUnauthorizedEndpoint();
 

@@ -6,12 +6,11 @@ import {GasParams} from "../interfaces/IRootBridgeAgent.sol";
 
 import {VirtualAccount} from "../VirtualAccount.sol";
 
-/// @title Core Root Router Interface
 interface ICoreRootRouter {
     function bridgeAgentAddress() external view returns (address);
     function hTokenFactoryAddress() external view returns (address);
     function setCoreBranch(
-        address _refundee,
+        address _gasRefundee,
         address _coreBranchRouter,
         address _coreBranchBridgeAgent,
         uint16 _dstChainId,
@@ -31,7 +30,7 @@ interface ICoreRootRouter {
 interface IRootPort {
     /*///////////////////////////////////////////////////////////////
                         VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
     /**
      * @notice View Function returns True if the chain Id has been added to the system.
      *  @param _chainId The Layer Zero chainId of the chain.
@@ -170,69 +169,83 @@ interface IRootPort {
     function isRouterApproved(VirtualAccount _userAccount, address _router) external returns (bool);
 
     /*///////////////////////////////////////////////////////////////
-                        hTOKEN ACCOUTING FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
+                        BRIDGE AGENT MANAGER FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
     /**
-     * @notice Burns hTokens from the sender address.
-     * @param _from sender of the hTokens to burn.
-     * @param _hToken address of the hToken to burn.
-     * @param _amount amount of hTokens to burn.
-     * @param _srcChainId The chainId of the chain where the token is deployed.
+     * @notice Allows a root bridge agent to update it's bridge agent manager address.
+     *  @param _newManager address of the new bridge agent manager.
      */
-    function burn(address _from, address _hToken, uint256 _amount, uint256 _srcChainId) external;
+    function setBridgeAgentManager(address _newManager) external;
+
+    /*///////////////////////////////////////////////////////////////
+                        hTOKEN ACCOUTING FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Updates root port state to match a new deposit.
-     * @param _recipient recipient of bridged tokens.
-     * @param _hToken address of the hToken to bridge.
-     * @param _amount amount of hTokens to bridge.
-     * @param _deposit amount of underlying tokens to deposit.
-     * @param _srcChainId The chainId of the chain where the token is deployed.
+     *   @param _to recipient of bridged tokens.
+     *   @param _hToken address of the hToken to bridge.
+     *   @param _amount amount of hTokens to bridge.
+     *   @param _deposit amount of underlying tokens to deposit.
+     *   @param _srcChainId chainId of the chain where the tokens are being bridged from.
      */
-    function bridgeToRoot(address _recipient, address _hToken, uint256 _amount, uint256 _deposit, uint256 _srcChainId)
+    function bridgeToRoot(address _to, address _hToken, uint256 _amount, uint256 _deposit, uint256 _srcChainId)
         external;
 
     /**
-     * @notice Bridges hTokens from the local branch to the root port.
-     * @param _from sender of the hTokens to bridge.
-     * @param _hToken address of the hToken to bridge.
-     * @param _amount amount of hTokens to bridge.
+     * @notice Updates root port state to match hTokens being bridged to branch.
+     *   @param _from depositor of the hTokens to bridge.
+     *   @param _hToken address of the hToken to bridge.
+     *   @param _amount amount of hTokens to bridge.
+     *   @param _deposit amount of underlying tokens to deposit.
+     *   @param _dstChainId chainId of the chain where the tokens are being bridged to.
+     */
+    function bridgeToBranch(address _from, address _hToken, uint256 _amount, uint256 _deposit, uint256 _dstChainId)
+        external;
+
+    /**
+     * @notice Bridges hTokens from the local arbitrum branch for usage in the root port.
+     *   @param _from sender of the hTokens to bridge.
+     *   @param _hToken address of the hToken to bridge.
+     *   @param _amount amount of hTokens to bridge.
      */
     function bridgeToRootFromLocalBranch(address _from, address _hToken, uint256 _amount) external;
 
     /**
-     * @notice Bridges hTokens from the root port to the local branch.
-     * @param _to recipient of the bridged tokens.
-     * @param _hToken address of the hToken to bridge.
-     * @param _amount amount of hTokens to bridge.
+     * @notice Bridges hTokens from the root port to the local arbitrum branch.
+     *   @param _to recipient of the bridged tokens.
+     *   @param _hToken address of the hToken to bridge.
+     *   @param _amount amount of hTokens to bridge.
      */
     function bridgeToLocalBranchFromRoot(address _to, address _hToken, uint256 _amount) external;
 
     /**
-     * @notice Mints new tokens to the recipient address
-     * @param _recipient recipient of the newly minted tokens.
-     * @param _hToken address of the hToken to mint.
-     * @param _amount amount of tokens to mint.
-     */
-    function mintToLocalBranch(address _recipient, address _hToken, uint256 _amount) external;
-
-    /**
-     * @notice Burns tokens from the sender address
-     * @param _from sender of the tokens to burn.
-     * @param _hToken address of the hToken to burn.
-     * @param _amount amount of tokens to burn.
+     * @notice Burns tokens from the Arbitrum Branch Port withdrawer address.
+     *   @param _from sender of the tokens to burn.
+     *   @param _hToken address of the hToken to burn.
+     *   @param _amount amount of tokens to burn.
      */
     function burnFromLocalBranch(address _from, address _hToken, uint256 _amount) external;
 
+    /**
+     * @notice Mints new root hTokens to the recipient address in reflection of Artbitrum Branch Port deposit.
+     *   @param _to recipient of the newly minted tokens.
+     *   @param _hToken address of the hToken to mint.
+     *   @param _amount amount of tokens to mint.
+     */
+    function mintToLocalBranch(address _to, address _hToken, uint256 _amount) external;
+
     /*///////////////////////////////////////////////////////////////
                         hTOKEN MANAGEMENT FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Setter function to update a Global hToken's Local hToken Address.
-     *   @param _globalAddress new hToken address to update.
-     *   @param _localAddress new underlying/native token address to set.
+     * @notice Setter function to add a new underlying token to the system. Includes the creation of a new local hToken
+     *         and global hToken.
+     *   @param _globalAddress new root hToken address to set.
+     *   @param _localAddress new origin chain local hToken address to set.
+     *   @param _underlyingAddress new underlying/native token address to set.
+     *   @param _srcChainId chainId of the chain where the token is deployed.
      *
      */
     function setAddresses(
@@ -255,32 +268,32 @@ interface IRootPort {
     ///////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Gets the virtual account given a user address.
+     * @notice Gets the virtual account given a user address. Creates a new virtual account if one does not exist.
      * @param _user address of the user to get the virtual account for.
      */
     function fetchVirtualAccount(address _user) external returns (VirtualAccount account);
 
     /**
-     * @notice Toggles the approval of a router for a virtual account.
-     * @dev Allows for a router to spend from a user's virtual account.
+     * @notice Toggles the approval of a router for virtual account usage.
+     * @dev Allows for a router to interact/spend from a user's virtual account.
      * @param _userAccount virtual account to toggle the approval for.
      * @param _router router to toggle the approval for.
      */
     function toggleVirtualAccountApproved(VirtualAccount _userAccount, address _router) external;
 
     /*///////////////////////////////////////////////////////////////
-                        BRIDGE AGENT MANAGEMENT FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+                    BRIDGE AGENT MANAGEMENT FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Adds a new bridge agent to the list of bridge agents.
+     * @notice Adds a new bridge agent to the system.
      * @param _manager address of the manager of the bridge agent.
      * @param _bridgeAgent address of the bridge agent to add.
      */
     function addBridgeAgent(address _manager, address _bridgeAgent) external;
 
     /**
-     * @notice Sets the address of the bridge agent for a given chain.
+     * @notice Sets the address of the branch bridge agent connected to a root bridge agent for a given chain.
      * @param _newBranchBridgeAgent address of the new branch bridge agent.
      * @param _rootBridgeAgent address of the root bridge agent.
      * @param _srcChainId chainId of the chain to set the bridge agent for.
@@ -289,14 +302,8 @@ interface IRootPort {
         external;
 
     /*///////////////////////////////////////////////////////////////
-                        ADMIN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Adds a new bridge agent factory to the list of bridge agent factories.
-     * @param _bridgeAgentFactory address of the bridge agent factory to add.
-     */
-    function addBridgeAgentFactory(address _bridgeAgentFactory) external;
+                            ADMIN FUNCTIONS
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Toggles the status of a bridge agent factory.
@@ -305,13 +312,13 @@ interface IRootPort {
     function toggleBridgeAgentFactory(address _bridgeAgentFactory) external;
 
     /**
-     * @notice Adds a new chain to the root port lists of chains
+     * @notice Adds a new chain to the root port lists of chains and adds core branch contracts to system.
      * @param _coreBranchBridgeAgentAddress address of the core branch bridge agent
      * @param _chainId chainId of the new chain
-     * @param _wrappedGasTokenName gas token name of the chain to add
-     * @param _wrappedGasTokenSymbol gas token symbol of the chain to add
-     * @param _wrappedGasTokenDecimals gas token decimals of the chain to add
-     * @param _newLocalBranchWrappedNativeTokenAddress address of the wrapped native token of the new branch
+     * @param _wrappedGasTokenName gas token name of the new chain
+     * @param _wrappedGasTokenSymbol gas token symbol of the new chain
+     * @param _wrappedGasTokenDecimals gas token decimals of the new chain
+     * @param _newLocalBranchWrappedNativeTokenAddress address of the wrapped native local hToken of the new chain
      * @param _newUnderlyingBranchWrappedNativeTokenAddress new branch address of the underlying wrapped native token
      */
     function addNewChain(
@@ -354,7 +361,7 @@ interface IRootPort {
     ) external payable;
 
     /**
-     * @notice Syncs a newly added core branch router and bridge agent
+     * @notice Syncs a new core branch router and bridge agent.
      * @param _coreBranchRouter address of the core branch router
      * @param _coreBranchBridgeAgent address of the core branch bridge agent
      * @param _dstChainId chainId of the destination chain
@@ -363,66 +370,106 @@ interface IRootPort {
         external;
 
     /**
-     * @notice Allows governance to claim any native tokens accumulated from failed transactions.
-     *  @param _recipient address to transfer ETH to.
+     * @notice Allows governance to withdraw any native tokens accumulated from failed transactions.
+     *  @param _to address to transfer ETH to.
      */
-    function sweep(address _recipient) external;
+    function sweep(address _to) external;
 
     /*///////////////////////////////////////////////////////////////
                             EVENTS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
-    event BridgeAgentFactoryAdded(address indexed bridgeAgentFactory);
-    event BridgeAgentFactoryToggled(address indexed bridgeAgentFactory);
-
-    event BridgeAgentAdded(address indexed bridgeAgent, address indexed manager);
-    event BridgeAgentToggled(address indexed bridgeAgent);
-    event BridgeAgentSynced(address indexed bridgeAgent, address indexed rootBridgeAgent, uint256 indexed srcChainId);
-
+    /// @notice Emitted when a new chain is added to the system.
     event NewChainAdded(uint256 indexed chainId);
 
+    /// @notice Emitted when a new bridge agent factory is added or removed.
+    event BridgeAgentFactoryToggled(address indexed bridgeAgentFactory);
+    /// @notice Emitted when a new bridge agent is added or removed.
+    event BridgeAgentToggled(address indexed bridgeAgent);
+    /// @notice Emitted when a new branch bridge agent is added to a root bridge agent.
+    event BridgeAgentSynced(address indexed bridgeAgent, address indexed rootBridgeAgent, uint256 indexed srcChainId);
+
+    /// @notice Emitted when a new Virtual Account is created.
     event VirtualAccountCreated(address indexed user, address account);
 
+    /// @notice Emitted when a new local token is added to the system.
     event LocalTokenAdded(
         address indexed underlyingAddress, address indexed localAddress, address indexed globalAddress, uint256 chainId
     );
+    /// @notice Emitted when a new global token is added to the system.
     event GlobalTokenAdded(address indexed localAddress, address indexed globalAddress, uint256 indexed chainId);
+    /// @notice Emitted when a new Ecosystem Token is added to the system.
     event EcosystemTokenAdded(address indexed ecoTokenGlobalAddress);
+
+    /// @notice Emitted when the Core Root Router and Bridge Agent are set.
     event CoreRootSet(address indexed coreRootRouter, address indexed coreRootBridgeAgent);
+    /// @notice Emitted when a new Core Branch Router and Bridge Agent are set.
     event CoreBranchSet(
         address indexed coreBranchRouter, address indexed coreBranchBridgeAgent, uint16 indexed dstChainId
     );
+    /// @notice Emitted when a new Core Branch Router and Bridge Agent are synced with the root environment.
     event CoreBranchSynced(
         address indexed coreBranchRouter, address indexed coreBranchBridgeAgent, uint16 indexed dstChainId
     );
 
     /*///////////////////////////////////////////////////////////////
                             ERRORS  
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
-    error InvalidGlobalAddress();
-    error InvalidLocalAddress();
-    error InvalidUnderlyingAddress();
+    /// @notice Error emitted when owner tries to renounce ownership.
+    error RenounceOwnershipNotAllowed();
 
-    error InvalidUserAddress();
+    /// @notice Error emitted when Set Up period is over.
+    error SetUpEnded();
+    /// @notice Error emitted when Core Set Up period is over.
+    error SetUpCoreEnded();
 
-    error InvalidCoreRootRouter();
-    error InvalidCoreRootBridgeAgent();
-    error InvalidCoreBranchRouter();
-    error InvalidCoreBrancBridgeAgent();
-
-    error UnrecognizedBridgeAgentFactory();
-    error UnrecognizedBridgeAgent();
-
-    error UnrecognizedToken();
+    /// @notice Error emitted when hToken minting fails.
     error UnableToMint();
+    /// @notice Error emitted when hToken bridging fails due to insufficient balance.
+    error InsufficientBalance();
 
+    /// @notice Error emitted when an invalid global token address is provided.
+    error InvalidGlobalAddress();
+    /// @notice Error emitted when an invalid local token address is provided.
+    error InvalidLocalAddress();
+    /// @notice Error emitted when an invalid underlying token address is provided.
+    error InvalidUnderlyingAddress();
+    /// @notice Error emitted when zero address is provided for Virtual Account creation.
+    error InvalidUserAddress();
+    /// @notice Error emitted when zero address is provided for CoreRootRouter.
+    error InvalidCoreRootRouter();
+    /// @notice Error emitted when zero address is provided for CoreRootBridgeAgent.
+    error InvalidCoreRootBridgeAgent();
+    /// @notice Error emitted when zero address is provided for CoreBranchRouter.
+    error InvalidCoreBranchRouter();
+    /// @notice Error emitted when zero address is provided for CoreBranchBridgeAgent.
+    error InvalidCoreBrancBridgeAgent();
+    /// @notice Error emitted when zero address is provided for RootBridgeAgentFactory.
+    error InvalidRootBridgeAgentFactory();
+    /// @notice Error emitted when zero address is provided for Branch Port.
+    error InvalidBranchPort();
+
+    /// @notice Error emitted when caller is not a Bridge Agent Factory.
+    error UnrecognizedBridgeAgentFactory();
+    /// @notice Error emitted when caller is not a Bridge Agent.
+    error UnrecognizedBridgeAgent();
+    /// @notice Error emitted when caller is not the Core Root Router.
+    error UnrecognizedCoreRootRouter();
+    /// @notice Error emitted when caller is not the Arbitrum Branch
+    error UnrecognizedLocalBranchPort();
+    /// @notice Error emitted when Core Root Bridge Agent being added isn't added as Bridge Agent yet.
+    error UnrecognizedCoreRootBridgeAgent();
+
+    /// @notice Error emitted when trying to add a chain that already exists.
     error AlreadyAddedChain();
+    /// @notice Error emitted when trying to add a token that already exists as an Ecosystem Token.
     error AlreadyAddedEcosystemToken();
 
+    /// @notice Error emitted when trying to add a Bridge Agent that already exists.
     error AlreadyAddedBridgeAgent();
+    /// @notice Error emitted when trying to add a Bridge Agent Factory that already exists.
     error AlreadyAddedBridgeAgentFactory();
+    /// @notice Error emitted when trying to add a chain to a Root Bridge Agent without a Bridge Agent Manager allowing.
     error BridgeAgentNotAllowed();
-    error UnrecognizedCoreRootRouter();
-    error UnrecognizedLocalBranchPort();
 }

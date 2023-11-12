@@ -72,12 +72,7 @@ contract BridgeAgentConstants {
     // (hToken, token, amount, deposit)
     uint256 internal constant PARAMS_TKN_SET_SIZE_MULTIPLE = 128;
 
-    uint256 internal constant ADDRESS_END_OFFSET = 12;
-
-    uint256 internal constant PARAMS_AMT_OFFSET = 64;
-
-    uint256 internal constant PARAMS_DEPOSIT_OFFSET = 96;
-
+    // Offset in bytes to mark the end of the standard (deposit related) parameters in the payload.
     uint256 internal constant PARAMS_END_OFFSET = 6;
 
     // Offset in bytes to mark the end of the standard (deposit related) signed parameters in the payload.

@@ -11,6 +11,8 @@ import {
     SettlementParams
 } from "./BridgeAgentStructs.sol";
 
+import {ILayerZeroReceiver} from "./ILayerZeroReceiver.sol";
+
 /*///////////////////////////////////////////////////////////////
                             ENUMS
 //////////////////////////////////////////////////////////////*/
@@ -44,8 +46,8 @@ import {
  *       0x01 | Call to Root Router without Deposit.
  *       0x02 | Call to Root Router with Deposit.
  *       0x03 | Call to Root Router with Deposit of Multiple Tokens.
- *       0x04 | Call to Root Router without Deposit + singned message.
- *       0x05 | Call to Root Router with Deposit + singned message.
+ *       0x04 | Call to Root Router without Deposit + signed message.
+ *       0x05 | Call to Root Router with Deposit + signed message.
  *       0x06 | Call to Root Router with Deposit of Multiple Tokens + signed message.
  *       0x07 | Call to `retrySettlement()´. (retries sending a settlement w/ new calldata for execution + new gas)
  *       0x08 | Call to `retrieveDeposit()´. (clears a deposit that has not been executed yet triggering `_fallback`)
@@ -87,21 +89,21 @@ import {
  *            BridgeAgentExecutor (txExecuted)
  *
  */
-interface IRootBridgeAgent {
+interface IRootBridgeAgent is ILayerZeroReceiver {
     /*///////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function that returns the current settlement nonce.
-     *   @return nonce bridge agent's current settlement nonce
+     *  @return nonce bridge agent's current settlement nonce
      *
      */
     function settlementNonce() external view returns (uint32 nonce);
 
     /**
      * @notice External function that returns a given settlement entry.
-     *   @param _settlementNonce Identifier for token settlement.
+     *  @param _settlementNonce Identifier for token settlement.
      *
      */
     function getSettlementEntry(uint32 _settlementNonce) external view returns (Settlement memory);
@@ -114,55 +116,40 @@ interface IRootBridgeAgent {
 
     /**
      * @notice External function to get the Root Bridge Agent's Factory Address.
-     *   @return address Root Bridge Agent's Factory Address.
+     *  @return address Root Bridge Agent's Factory Address.
      */
     function factoryAddress() external view returns (address);
 
     /**
      * @notice External function to get the attached Branch Bridge Agent for a given chain.
-     *   @param _chainId Chain ID of the Branch Bridge Agent.
-     *   @return address Branch Bridge Agent Address.
+     *  @param _chainId Chain ID of the Branch Bridge Agent.
+     *  @return address Branch Bridge Agent Address.
      */
     function getBranchBridgeAgent(uint256 _chainId) external view returns (address);
 
     /**
      * @notice External function to verify a given chain has been allowed by the Root Bridge Agent's Manager
      *         for new Branch Bridge Agent creation.
-     *   @param _chainId Chain ID of the Branch Bridge Agent.
-     *   @return bool True if the chain has been allowed for new Branch Bridge Agent creation.
+     *  @param _chainId Chain ID of the Branch Bridge Agent.
+     *  @return bool True if the chain has been allowed for new Branch Bridge Agent creation.
      */
     function isBranchBridgeAgentAllowed(uint256 _chainId) external view returns (bool);
 
-    /**
-     * @notice External function that returns the message value needed for a cross-chain call according to
-     *         the destination chain and the given calldata and gas requirements.
-     *   @param _dstChainId destination Chain ID.
-     *   @param _payload Calldata for branch router execution.
-     *   @param _gasLimit Gas limit for cross-chain message.
-     *   @param _remoteBranchExecutionGas Gas limit for branch router execution.
-     *   @return _fee Message value needed for cross-chain call.
-     */
-    function getFeeEstimate(
-        uint256 _gasLimit,
-        uint256 _remoteBranchExecutionGas,
-        bytes calldata _payload,
-        uint16 _dstChainId
-    ) external view returns (uint256 _fee);
-
     /*///////////////////////////////////////////////////////////////
                         ROOT ROUTER CALL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice External function performs call to LayerZero Endpoint Contract for cross-chain messaging.
-     *   @param _recipient address to receive any outstanding gas on the destination chain.
-     *   @param _dstChainId Chain to bridge to.
-     *   @param _params Calldata for function call.
-     *   @param _gParams Gas Parameters for cross-chain message.
-     *   @dev Internal function performs call to LayerZero Endpoint Contract for cross-chain messaging.
+     *  @param _gasRefundee Address to return excess gas deposited in `msg.value` to.
+     *  @param _recipient address to receive any outstanding gas on the destination chain.
+     *  @param _dstChainId Chain to bridge to.
+     *  @param _params Calldata for function call.
+     *  @param _gParams Gas Parameters for cross-chain message.
+     *  @dev Internal function performs call to LayerZero Endpoint Contract for cross-chain messaging.
      */
     function callOut(
-        address payable _refundee,
+        address payable _gasRefundee,
         address _recipient,
         uint16 _dstChainId,
         bytes memory _params,
@@ -171,19 +158,19 @@ interface IRootBridgeAgent {
 
     /**
      * @notice External function to move assets from root chain to branch omnichain environment.
-     *   @param _refundee the effective owner of the settlement this address receives excess gas deposited on source chain
-     *                    for a cross-chain call and is allowed to redeeming assets after a failed settlement fallback.
-     *                    This address' Virtual Account is also allowed.
-     *   @param _recipient recipient of bridged tokens and any outstanding gas on the destination chain.
-     *   @param _dstChainId chain to bridge to.
-     *   @param _params parameters for function call on branch chain.
-     *   @param _sParams settlement parameters for asset bridging to branch chains.
-     *   @param _gParams Gas Parameters for cross-chain message.
-     *   @param _hasFallbackToggled Flag to toggle fallback function.
+     *  @param _settlementOwnerAndGasRefundee the effective owner of the settlement this address receives
+     *                    excess gas deposited on source chain for a cross-chain call and is allowed to redeeming
+     *                    assets after a failed settlement fallback. This address' Virtual Account is also allowed.
+     *  @param _recipient recipient of bridged tokens and any outstanding gas on the destination chain.
+     *  @param _dstChainId chain to bridge to.
+     *  @param _params parameters for function call on branch chain.
+     *  @param _sParams settlement parameters for asset bridging to branch chains.
+     *  @param _gParams Gas Parameters for cross-chain message.
+     *  @param _hasFallbackToggled Flag to toggle fallback function.
      *
      */
     function callOutAndBridge(
-        address payable _refundee,
+        address payable _settlementOwnerAndGasRefundee,
         address _recipient,
         uint16 _dstChainId,
         bytes calldata _params,
@@ -194,20 +181,20 @@ interface IRootBridgeAgent {
 
     /**
      * @notice External function to move assets from branch chain to root omnichain environment.
-     *   @param _refundee the effective owner of the settlement this address receives excess gas deposited on source chain
-     *                    for a cross-chain call and is allowed to redeeming assets after a failed settlement fallback.
-     *                    This address' Virtual Account is also allowed.
-     *   @param _recipient recipient of bridged tokens.
-     *   @param _dstChainId chain to bridge to.
-     *   @param _params parameters for function call on branch chain.
-     *   @param _sParams settlement parameters for asset bridging to branch chains.
-     *   @param _gParams Gas Parameters for cross-chain message.
-     *   @param _hasFallbackToggled Flag to toggle fallback function.
+     *  @param _settlementOwnerAndGasRefundee the effective owner of the settlement this address receives
+     *                    excess gas deposited on source chain for a cross-chain call and is allowed to redeeming
+     *                    assets after a failed settlement fallback. This address' Virtual Account is also allowed.
+     *  @param _recipient recipient of bridged tokens.
+     *  @param _dstChainId chain to bridge to.
+     *  @param _params parameters for function call on branch chain.
+     *  @param _sParams settlement parameters for asset bridging to branch chains.
+     *  @param _gParams Gas Parameters for cross-chain message.
+     *  @param _hasFallbackToggled Flag to toggle fallback function.
      *
      *
      */
     function callOutAndBridgeMultiple(
-        address payable _refundee,
+        address payable _settlementOwnerAndGasRefundee,
         address _recipient,
         uint16 _dstChainId,
         bytes calldata _params,
@@ -218,19 +205,19 @@ interface IRootBridgeAgent {
 
     /*///////////////////////////////////////////////////////////////
                         SETTLEMENT FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to retry a user's Settlement balance.
-     *   @param _owner owner of the settlement.
-     *   @param _settlementNonce Identifier for token settlement.
-     *   @param _recipient recipient of bridged tokens and any outstanding gas on the destination chain.
-     *   @param _params Calldata for function call in branch chain.
-     *   @param _gParams Gas Parameters for cross-chain message.
-     *   @param _hasFallbackToggled Flag to toggle fallback function.
+     *  @param _settlementOwnerAndGasRefundee owner of the settlement and gas refundee.
+     *  @param _settlementNonce Identifier for token settlement.
+     *  @param _recipient recipient of bridged tokens and any outstanding gas on the destination chain.
+     *  @param _params Calldata for function call in branch chain.
+     *  @param _gParams Gas Parameters for cross-chain message.
+     *  @param _hasFallbackToggled Flag to toggle fallback function.
      */
     function retrySettlement(
-        address _owner,
+        address _settlementOwnerAndGasRefundee,
         uint32 _settlementNonce,
         address _recipient,
         bytes calldata _params,
@@ -240,29 +227,30 @@ interface IRootBridgeAgent {
 
     /**
      * @notice Function that allows retrieval of failed Settlement's foricng fallback to be triggered.
-     *   @param _settlementNonce Identifier for token settlement.
-     *   @param _gParams Gas Parameters for cross-chain message.
+     *  @param _settlementNonce Identifier for token settlement.
+     *  @param _gParams Gas Parameters for cross-chain message.
      *
      */
     function retrieveSettlement(uint32 _settlementNonce, GasParams calldata _gParams) external payable;
 
     /**
      * @notice Function that allows redemption of failed Settlement's global tokens.
-     *   @param _depositNonce Identifier for token deposit.
+     *  @param _depositNonce Identifier for token deposit.
+     *  @param _recipient recipient of redeemed root/global tokens.
      *
      */
-    function redeemSettlement(uint32 _depositNonce) external;
+    function redeemSettlement(uint32 _depositNonce, address _recipient) external;
 
     /*///////////////////////////////////////////////////////////////
                     TOKEN MANAGEMENT FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to move assets from branch chain to root omnichain environment.
      * @dev Called in response to Bridge Agent Executor.
-     *   @param _recipient recipient of bridged token.
-     *   @param _dParams Cross-Chain Deposit of Multiple Tokens Params.
-     *   @param _srcChainId chain to bridge from.
+     *  @param _recipient recipient of bridged token.
+     *  @param _dParams Cross-Chain Deposit of Multiple Tokens Params.
+     *  @param _srcChainId chain to bridge from.
      *
      */
     function bridgeIn(address _recipient, DepositParams memory _dParams, uint256 _srcChainId) external;
@@ -270,10 +258,10 @@ interface IRootBridgeAgent {
     /**
      * @notice Function to move assets from branch chain to root omnichain environment.
      * @dev Called in response to Bridge Agent Executor.
-     *   @param _recipient recipient of bridged tokens.
-     *   @param _dParams Cross-Chain Deposit of Multiple Tokens Params.
-     *   @param _srcChainId chain to bridge from.
-     *   @dev Since the input data is encodePacked we need to parse it:
+     *  @param _recipient recipient of bridged tokens.
+     *  @param _dParams Cross-Chain Deposit of Multiple Tokens Params.
+     *  @param _srcChainId chain to bridge from.
+     *  @dev Since the input data is encodePacked we need to parse it:
      *     1. First byte is the number of assets to be bridged in. Equals length of all arrays.
      *     2. Next 4 bytes are the nonce of the deposit.
      *     3. Last 32 bytes after the token related information are the chain to bridge to.
@@ -293,62 +281,43 @@ interface IRootBridgeAgent {
         external;
 
     /*///////////////////////////////////////////////////////////////
-                            LAYER ZERO FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-        * @notice External function to receive cross-chain messages from LayerZero Endpoint Contract.
-        *   @param _srcChainId Chain ID of the sender.
-        *   @param _srcAddress address path of the recipient + sender.
-        *   @param _nonce Nonce of the message.
-        *   @param _payload Calldata for function call.
-        *  @return bool True if the message was successfully received.
-     */
-    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64 _nonce, bytes calldata _payload)
-        external
-        returns (bool);
-
-    /**
-     * @notice External function to receive cross-chain messages from LayerZero Endpoint Contract without blocking.
-     *   @param _endpoint address of the LayerZero Endpoint Contract.
-     *   @param _srcChainId Chain ID of the sender.
-     *   @param _srcAddress address path of the recipient + sender.
-     *   @param _payload Calldata for function call.
-     */
-    function lzReceiveNonBlocking(
-        address _endpoint,
-        uint16 _srcChainId,
-        bytes calldata _srcAddress,
-        bytes calldata _payload
-    ) external;
-
-    /*///////////////////////////////////////////////////////////////
                             ADMIN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Adds a new branch bridge agent to a given branch chainId
-     *   @param _branchChainId chainId of the branch chain
+     *  @param _branchChainId chainId of the branch chain
      */
     function approveBranchBridgeAgent(uint256 _branchChainId) external;
 
     /**
      * @notice Updates the address of the branch bridge agent
-     *   @param _newBranchBridgeAgent address of the new branch bridge agent
-     *   @param _branchChainId chainId of the branch chain
+     *  @param _newBranchBridgeAgent address of the new branch bridge agent
+     *  @param _branchChainId chainId of the branch chain
      */
     function syncBranchBridgeAgent(address _newBranchBridgeAgent, uint256 _branchChainId) external;
 
+    /**
+     * @notice Allows current bridge agent manager to allowlist a successor address.
+     *  @param _newManager address of the new bridge agent manager.
+     */
+    function transferManagementRole(address _newManager) external;
+
+    /**
+     * @notice Used by the new bridge agent manager to accept the management role.
+     */
+    function acceptManagementRole() external;
+
     /*///////////////////////////////////////////////////////////////
                              EVENTS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     event LogExecute(uint256 indexed depositNonce, uint256 indexed srcChainId);
     event LogFallback(uint256 indexed settlementNonce, uint256 indexed dstChainId);
 
     /*///////////////////////////////////////////////////////////////
                             ERRORS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     error ExecutionFailure();
     error GasErrorOrRepeatedTx();
@@ -376,6 +345,7 @@ interface IRootBridgeAgent {
     error SettlementRedeemUnavailable();
     error SettlementRetrieveUnavailable();
     error NotSettlementOwner();
+    error ContractsVirtualAccountNotAllowed();
 
     error InsufficientBalanceForSettlement();
     error InsufficientGasForFees();

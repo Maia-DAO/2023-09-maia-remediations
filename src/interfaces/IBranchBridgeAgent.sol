@@ -11,6 +11,7 @@ import {
     SettlementParams,
     SettlementMultipleParams
 } from "./BridgeAgentStructs.sol";
+import {ILayerZeroReceiver} from "./ILayerZeroReceiver.sol";
 
 /*///////////////////////////////////////////////////////////////
                             ENUMS
@@ -82,10 +83,10 @@ import {
  *            BridgeAgentExecutor (txExecuted)
  *
  */
-interface IBranchBridgeAgent {
+interface IBranchBridgeAgent is ILayerZeroReceiver {
     /*///////////////////////////////////////////////////////////////
                         VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice External function to return the Branch Chain's Local Port Address.
@@ -101,27 +102,12 @@ interface IBranchBridgeAgent {
 
     /**
      * @notice External function that returns a given deposit entry.
-     *    @param depositNonce Identifier for user deposit.
-     *
+     *  @param depositNonce Identifier for user deposit.
      */
     function getDepositEntry(uint32 depositNonce) external view returns (Deposit memory);
 
-    /**
-     * @notice External function that returns the message value needed for a cross-chain call according to given
-     *         calldata and gas requirements.
-     *    @param _gasLimit Gas limit for the cross-chain call.
-     *    @param _remoteBranchExecutionGas Gas is required for the remote execution.
-     *    @param _payload Calldata for the cross-chain call.
-     *    @return _fee Message value needed for the cross-chain call.
-     *
-     */
-    function getFeeEstimate(uint256 _gasLimit, uint256 _remoteBranchExecutionGas, bytes calldata _payload)
-        external
-        view
-        returns (uint256 _fee);
-
     /*///////////////////////////////////////////////////////////////
-                        BRANCH ROUTER FUNCTIONS
+                    USER AND BRANCH ROUTER FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
 
     /**
@@ -207,8 +193,6 @@ interface IBranchBridgeAgent {
         bool hasFallbackToggled
     ) external payable;
 
-
-    
     /*///////////////////////////////////////////////////////////////
                     DEPOSIT EXTERNAL FUNCTIONS
     ///////////////////////////////////////////////////////////////*/
@@ -265,16 +249,15 @@ interface IBranchBridgeAgent {
 
     /*///////////////////////////////////////////////////////////////
                     SETTLEMENT EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice External function to retry a failed Settlement entry on the root chain.
-     *   @param settlementNonce Identifier for user settlement.
-     *   @param params parameters to execute on the root chain router.
-     *   @param gasParams gas parameters for the cross-chain call to root chain and for the settlement to branch.
-     *   @param hasFallbackToggled flag to indicate if the fallback function should be toggled.
-     *   @dev DEPOSIT ID: 7
-     *
+     *  @param settlementNonce Identifier for user settlement.
+     *  @param params parameters to execute on the root chain router.
+     *  @param gasParams gas parameters for the cross-chain call to root chain and for the settlement to branch.
+     *  @param hasFallbackToggled flag to indicate if the fallback function should be toggled.
+     *  @dev DEPOSIT ID: 7
      */
     function retrySettlement(
         uint32 settlementNonce,
@@ -285,67 +268,35 @@ interface IBranchBridgeAgent {
 
     /*///////////////////////////////////////////////////////////////
                     TOKEN MANAGEMENT EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Function to request balance clearance from a Port to a given user.
-     *     @param recipient token receiver.
-     *     @param hToken  local hToken addresse to clear balance for.
-     *     @param token  native / underlying token addresse to clear balance for.
-     *     @param amount amounts of hToken to clear balance for.
-     *     @param deposit amount of native / underlying tokens to clear balance for.
-     *
+     *  @param recipient token receiver.
+     *  @param hToken  local hToken addresse to clear balance for.
+     *  @param token  native / underlying token addresse to clear balance for.
+     *  @param amount amounts of hToken to clear balance for.
+     *  @param deposit amount of native / underlying tokens to clear balance for.
      */
-    function clearToken(address recipient, address hToken, address token, uint256 amount, uint256 deposit) external;
+    function bridgeIn(address recipient, address hToken, address token, uint256 amount, uint256 deposit) external;
 
     /**
      * @notice Function to request balance clearance from a Port to a given address.
-     *     @param sParams encode packed multiple settlement info.
-     *
+     *  @param recipient token receiver.
+     *  @param sParams encode packed multiple settlement info.
      */
-    function clearTokens(bytes calldata sParams, address recipient)
-        external
-        returns (SettlementMultipleParams memory);
+    function bridgeInMultiple(address recipient, SettlementMultipleParams calldata sParams) external;
 
     /*///////////////////////////////////////////////////////////////
-                            LAYER ZERO FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice External function to receive cross-chain messages from LayerZero Endpoint Contract.
-     *   @param _srcChainId Chain ID of the sender.
-     *   @param _srcAddress address path of the recipient + sender.
-     *   @param _nonce Nonce of the message.
-     *   @param _payload Calldata for function call.
-     *  @return bool True if the message was successfully received.
-     */
-    function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64 _nonce, bytes calldata _payload)
-        external
-        returns (bool);
-
-    /**
-     * @notice External function to receive cross-chain messages from LayerZero Endpoint Contract without blocking.
-     *   @param _endpoint address of the LayerZero Endpoint Contract.
-     *   @param _srcAddress address path of the recipient + sender.
-     *   @param _payload Calldata for function call.
-     */
-    function lzReceiveNonBlocking(
-        address _endpoint,
-        uint16 _srcChainId,
-        bytes calldata _srcAddress,
-        bytes calldata _payload
-    ) external;
-
-    /*///////////////////////////////////////////////////////////////
-                        EVENTS
-    //////////////////////////////////////////////////////////////*/
+                                EVENTS
+    ///////////////////////////////////////////////////////////////*/
 
     event LogExecute(uint256 indexed nonce);
     event LogFallback(uint256 indexed nonce);
 
     /*///////////////////////////////////////////////////////////////
                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     error UnknownFlag();
     error ExecutionFailure();

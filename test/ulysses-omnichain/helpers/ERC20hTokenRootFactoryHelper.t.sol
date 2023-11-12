@@ -10,30 +10,21 @@ library ERC20hTokenRootFactoryHelper {
                             DEPLOY HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    function _deploy(ERC20hTokenRootFactory, uint16 _rootChainId, RootPort _rootPort)
+    function _deploy(ERC20hTokenRootFactory, RootPort _rootPort)
         internal
         returns (ERC20hTokenRootFactory _hTokenRootFactory)
     {
-        _hTokenRootFactory = new ERC20hTokenRootFactory(_rootChainId, address(_rootPort));
+        _hTokenRootFactory = new ERC20hTokenRootFactory(address(_rootPort));
 
-        _hTokenRootFactory.check_deploy(_rootChainId, _rootPort, address(this));
+        _hTokenRootFactory.check_deploy(_rootPort, address(this));
     }
 
-    function check_deploy(
-        ERC20hTokenRootFactory _hTokenRootFactory,
-        uint256 _rootChainId,
-        RootPort _rootPort,
-        address _owner
-    ) internal view {
-        _hTokenRootFactory.check_rootChainId(_rootChainId);
+    function check_deploy(ERC20hTokenRootFactory _hTokenRootFactory, RootPort _rootPort, address _owner)
+        internal
+        view
+    {
         _hTokenRootFactory.check_rootPort(_rootPort);
         _hTokenRootFactory.check_owner(_owner);
-    }
-
-    function check_rootChainId(ERC20hTokenRootFactory _hTokenRootFactory, uint256 _rootChainId) internal view {
-        require(
-            _hTokenRootFactory.localChainId() == _rootChainId, "Incorrect ERC20hTokenRootFactory Root Local Chain Id"
-        );
     }
 
     function check_rootPort(ERC20hTokenRootFactory _hTokenRootFactory, RootPort _rootPort) internal view {

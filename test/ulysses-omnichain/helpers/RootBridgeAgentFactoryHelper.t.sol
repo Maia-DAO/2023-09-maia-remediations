@@ -72,13 +72,15 @@ library RootBridgeAgentFactoryHelper {
     {
         _rootBridgeAgent = RootBridgeAgent(payable(_rootBridgeAgentFactory.createBridgeAgent(_routerAddress)));
 
-        RootPort(_rootBridgeAgentFactory.rootPortAddress()).check_addBridgeAgent(_rootBridgeAgent, address(this));
+        RootPort(payable(_rootBridgeAgentFactory.rootPortAddress())).check_addBridgeAgent(
+            _rootBridgeAgent, address(this)
+        );
 
         _rootBridgeAgent.check_deploy(
             address(_rootBridgeAgentFactory),
             _rootBridgeAgentFactory.rootChainId(),
             _rootBridgeAgentFactory.lzEndpointAddress(),
-            RootPort(_rootBridgeAgentFactory.rootPortAddress()),
+            RootPort(payable(_rootBridgeAgentFactory.rootPortAddress())),
             _routerAddress
         );
     }

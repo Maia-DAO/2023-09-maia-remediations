@@ -25,27 +25,26 @@ contract VirtualAccount is IVirtualAccount, ERC1155Receiver {
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /**
      * @notice Constructor for Virtual Account.
-     * @param _userAddress Address of the user account.
-     * @param _localPortAddress Address of the root port contract.
+     * @param _userAddress Address of the user/owner.
      */
-    constructor(address _userAddress, address _localPortAddress) {
+    constructor(address _userAddress) {
+        localPortAddress = msg.sender;
         userAddress = _userAddress;
-        localPortAddress = _localPortAddress;
     }
 
     /*//////////////////////////////////////////////////////////////
                             FALLBACK FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     receive() external payable {}
 
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IVirtualAccount
     function withdrawNative(uint256 _amount) external override requiresApprovedCaller {
@@ -119,7 +118,7 @@ contract VirtualAccount is IVirtualAccount, ERC1155Receiver {
 
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL HOOKS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IERC721Receiver
     function onERC721Received(address, address, uint256, bytes calldata) external pure override returns (bytes4) {
@@ -148,7 +147,7 @@ contract VirtualAccount is IVirtualAccount, ERC1155Receiver {
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL HELPERS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     function isContract(address addr) internal view returns (bool) {
         uint256 size;
@@ -160,7 +159,7 @@ contract VirtualAccount is IVirtualAccount, ERC1155Receiver {
 
     /*///////////////////////////////////////////////////////////////
                                 MODIFIERS
-    //////////////////////////////////////////////////////////////*/
+    ///////////////////////////////////////////////////////////////*/
 
     /// @notice Modifier that verifies msg sender is the approved to use the virtual account. Either the owner or an approved router.
     modifier requiresApprovedCaller() {

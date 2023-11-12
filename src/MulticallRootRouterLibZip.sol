@@ -18,10 +18,6 @@ import {MulticallRootRouter} from "./MulticallRootRouter.sol";
  *         0x01         | multicallNoOutput
  *         0x02         | multicallSingleOutput
  *         0x03         | multicallMultipleOutput
- *         0x04         | multicallSignedNoOutput
- *         0x05         | multicallSignedSingleOutput
- *         0x06         | multicallSignedMultipleOutput
- *
  */
 contract MulticallRootRouterLibZip is MulticallRootRouter {
     using LibZip for bytes;
